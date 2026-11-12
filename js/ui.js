@@ -14,6 +14,7 @@
   let autoDecide = false;
   let busy = false;
   let wantRun = false;   // 玩家是否希望时间继续流动（不因弹窗清掉）
+  let autoStarted = false;
 
   // ------------------------------------------------------------------ 主题
   const THEME_KEY = 'gongwei.theme';
@@ -155,7 +156,12 @@
     if (S.over) return finish();
     if (S.age >= D.meta.retireAge) return finish();
     const n = Sim.nextNode(S);
-    if (n) { pause(); openNode(n.node, filterOptions(n.options)); }
+    if (n) { pause(); openNode(n.node, filterOptions(n.options)); return; }
+    // 第一次真正进入年度循环时，自动开始流动
+    if (!autoStarted && !running && S.age >= 22) {
+      autoStarted = true;
+      play();
+    }
   }
 
   // ------------------------------------------------------------------ 计时器
@@ -633,7 +639,7 @@
       }
       afterStep();
       if (wantRun && !busy && !S.over) play(false);
-    });
+    }, 3.2);
   }
 
   function openEvent(ev, done) {
@@ -659,7 +665,7 @@
           closeModal();
           if (done) done();
           if (wantRun && !busy && !S.over) play(false);
-        });
+        }, 2.2);
       };
       box.appendChild(b);
     });
@@ -671,7 +677,7 @@
     }, 900);
   }
 
-  function showResult(lines, next) {
+  function showResult(lines, next, secs) {
     const box = $('#m-options'); box.hidden = true;
     const res = $('#m-result'); res.hidden = false; res.innerHTML = '';
     (lines.length ? lines : [{ text: '你没有说话。', kind: '' }]).forEach(function (l) {
@@ -682,8 +688,43 @@
     });
     const btn = $('#m-next');
     btn.hidden = false;
-    btn.onclick = function () { btn.onclick = null; next(); };
-    if (autoDecide) setTimeout(function () { if (!btn.hidden && btn.onclick) btn.click(); }, 800);
+    let advanced = false;
+    let countdown = (typeof secs === 'number' ? secs : 2.4);
+    let tick = null;
+    const total = countdown;
+
+    const go = function () {
+      if (advanced) return;
+      advanced = true;
+      if (tick) { clearInterval(tick); tick = null; }
+      btn.onclick = null;
+      btn.textContent = '继续';
+      next();
+    };
+    const render = function () {
+      btn.textContent = '继续 · ' + Math.max(0, countdown).toFixed(1) + 's';
+    };
+    const start = function () {
+      if (advanced || tick) return;
+      tick = setInterval(function () {
+        countdown -= 0.1;
+        if (countdown <= 0) return go();
+        render();
+      }, 100);
+    };
+    const halt = function () { if (tick) { clearInterval(tick); tick = null; } };
+
+    render();
+    start();
+    btn.onclick = go;
+
+    // 鼠标停在弹窗上时暂停倒计时，方便读结果
+    const sheet = document.querySelector('.sheet');
+    if (sheet) {
+      sheet.onmouseenter = halt;
+      sheet.onmouseleave = function () { if (!advanced) start(); };
+    }
+    if (autoDecide) setTimeout(go, 700);
   }
 
   function closeModal() { $('#modal').hidden = true; busy = false; }
