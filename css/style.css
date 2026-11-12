@@ -443,5 +443,9 @@ body.playing .theme-float { display: none; }
   .log { max-height: 46vh; }
   .end-metrics { grid-template-columns: repeat(2, 1fr); }
   .sheet { max-height: 92dvh; }
+  /* 结算页：把「再来一次 / 复制这一生」提到图表前面，手机上不用翻到底 */
+  #s-ending .ending-inner { display: flex; flex-direction: column; }
+  #s-ending .end-actions { order: 4; margin-top: 18px; }
+  #s-ending .chart-block { order: 5; }
   .chip { padding: 7px 13px; font-size: 12.5px; }
 }

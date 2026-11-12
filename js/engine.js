@@ -275,7 +275,7 @@
       const sell = Math.round((S.housePrice || 0) * (0.88 + S.rnd() * 0.12));
       st.cash += sell - st.debt;
       st.debt = 0; S.mortgageMonthly = 0;
-      S.flags.house = false; S.flags.soldHouse = true;
+      S.flags.house = false; S.flags.soldHouse = true; S.flags.foreclosed = true;
       st.spirit -= 10;
       out.lines.push({ age, kind: 'bad', text: '你把房子挂出去了。成交价 ' + (sell / 10000).toFixed(0) + ' 万，比买的时候低了 ' + Math.max(0, Math.round(((S.housePrice || 0) - sell) / 10000)) + ' 万。中介说"这个行情，能出手就不错了"。' });
     }               // 借债利息
@@ -333,7 +333,7 @@
     else if (st.cash < -600000) {
       out.lines.push({ age, kind: 'bad', text: '银行打来第三个电话。你没有接。' });
       S.over = true;
-      S.ending = E.evaluate(S, S.flags.house ? 'debt' : 'debt2');
+      S.ending = E.evaluate(S, (S.flags.house || S.flags.foreclosed) ? 'debt' : 'debt2');
     }
     else if (st.spirit <= 0) { out.lines.push({ age, kind: 'bad', text: '你在某个周一早上没有起床，也没有请假。' }); S.over = true; S.ending = E.evaluate(S, 'burnout'); }
 
@@ -641,7 +641,7 @@
         const fromCash = Math.min(Math.max(0, down - fromParents), cashAvail);
         st.cash -= fromCash;
         const gap = Math.max(0, down - fromCash - fromParents);
-        if (gap > 0) { st.debt += gap; st.spirit -= 2; }
+        if (gap > 0) { st.debt += gap; st.spirit = clamp(st.spirit - 2, 0, 100); }
         const loan = price - down;
         const r = 0.049 / 12, n = 360;
         const monthly = Math.round(loan * r / (1 - Math.pow(1 + r, -n)));
@@ -810,7 +810,10 @@
       st.hours = S.draw.industry.hours;
       E.revealIndustry(S);
     }
-    if (eff.pivot) { st.spirit += 3; S.flags.pivotCount = (S.flags.pivotCount || 0) + 1; }
+    if (eff.pivot) {
+      st.spirit = clamp(st.spirit + 3, 0, 100);
+      S.flags.pivotCount = (S.flags.pivotCount || 0) + 1;
+    }
 
     S.done[nodeId] = true;
     if (nodeId === 'n18' && !res.jump) res.jump = (S.draw.edu === '本科' ? 1 : 4);
@@ -830,14 +833,14 @@
 
     let id = 'default';
     if (st.health <= 0) id = 'sick';
-    else if (cash < -600000) id = S.flags.house ? 'debt' : 'debt2';
+    else if (cash < -600000) id = (S.flags.house || S.flags.foreclosed) ? 'debt' : 'debt2';
     else if (st.spirit <= 3) id = 'burnout';
     else if (S.flags.bossExit && cash > 1000000) id = 'boss';
     else if (cash > 2600000 && st.health < 40) id = 'burn';
     else if (cash > 520000 && st.health >= 45 && st.spirit >= 46) id = 'decent';
     else if ((S.flags.pivotCount || 0) >= 2 && st.spirit >= 58) id = 'restart';
     else if ((S.flags.manager || S.flags.expert) && st.spirit < 44) id = 'middle';
-    else if (st.skill < 40 && cash < 320000) id = 'forgotten';
+    else if (st.skill < 55 && cash < 260000 && !S.flags.manager && !S.flags.expert) id = 'forgotten';
     else if (S.flags.freelance && st.spirit > 62 &&
       (S.year - (S.flags.freelanceYear || 0)) >= 6) id = 'freelance';
     else if (cash > 100000 && st.health >= 50 && st.spirit >= 42) id = 'steady';

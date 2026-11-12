@@ -853,6 +853,7 @@
     const res = E.applyNodeOption(S, node.id, x.i);
     (res.lines || []).forEach(function (l) { S.log.push({ age: S.age, kind: l.kind, text: l.text }); });
     renderAll();
+    save();
     showResult(res.lines || [], function () {
       if (res.reopen) {
         const n = Sim.nextNode(S);
@@ -900,6 +901,7 @@
         const r = E.applyEvent(S, ev, i);
         (r.lines || []).forEach(function (l) { S.log.push({ age: S.age, kind: l.kind, text: l.text }); });
         renderAll();
+        save();
         showResult(r.lines || [], function () {
           closeModal();
           if (done) done();
