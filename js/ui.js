@@ -13,7 +13,7 @@
   let focusSel = 'learn';
   let autoDecide = false;
   let busy = false;
-  let resumeAfter = false;
+  let wantRun = false;   // 玩家是否希望时间继续流动（不因弹窗清掉）
 
   // ------------------------------------------------------------------ 主题
   const THEME_KEY = 'gongwei.theme';
@@ -168,14 +168,32 @@
     }, intervalMs());
   }
   function stopTimer() { if (timer) { clearInterval(timer); timer = null; } }
-  function play() {
-    if (!S || S.over) return;
+  function tickBar() {
+    const bar = document.getElementById('tickbar-fill');
+    if (!bar) return;
+    bar.style.transition = 'none';
+    bar.style.width = '0%';
+    if (!running) return;
+    void bar.offsetWidth;
+    bar.style.transition = 'width ' + intervalMs() + 'ms linear';
+    bar.style.width = '100%';
+  }
+  function resetTickBar() {
+    const bar = document.getElementById('tickbar-fill');
+    if (!bar) return;
+    bar.style.transition = 'none';
+    bar.style.width = running ? '100%' : '0%';
+  }
+  function play(immediate) {
+    if (!S || S.over || busy) { return; }
+    wantRun = true;
     running = true;
     $('#play-ico').textContent = '❚❚';
     $('#play-txt').textContent = '暂停';
     $('#btn-play').classList.add('running');
     startTimer();
-    if (!busy) stepOnce();
+    if (immediate !== false) stepOnce();
+    tickBar();
   }
   function pause() {
     running = false;
@@ -183,10 +201,13 @@
     $('#play-ico').textContent = '▶';
     $('#play-txt').textContent = '继续';
     $('#btn-play').classList.remove('running');
+    resetTickBar();
   }
+  function stopPlay() { wantRun = false; pause(); }
 
   // ------------------------------------------------------------------ 快进
   function skipToNode() {
+    wantRun = false;
     pause();
     let guard = 0;
     while (!busy && !S.over && guard++ < 60) {
@@ -568,7 +589,7 @@
   }
 
   function openNode(node, options) {
-    busy = true; resumeAfter = running; pause();
+    busy = true; pause();
     renderAll();
     const m = $('#modal'); m.hidden = false;
     $('#m-kicker').textContent = '抉择 · ' + S.age + ' 岁';
@@ -611,12 +632,12 @@
         if (n2) { openNode(n2.node, filterOptions(n2.options)); return; }
       }
       afterStep();
-      if (resumeAfter) { resumeAfter = false; play(); }
+      if (wantRun && !busy && !S.over) play(false);
     });
   }
 
   function openEvent(ev, done) {
-    busy = true; resumeAfter = running; pause();
+    busy = true; pause();
     renderAll();
     const m = $('#modal'); m.hidden = false;
     $('#m-kicker').textContent = '事件 · ' + (ev.tag || '');
@@ -637,7 +658,7 @@
         showResult(r.lines || [], function () {
           closeModal();
           if (done) done();
-          if (resumeAfter) { resumeAfter = false; play(); }
+          if (wantRun && !busy && !S.over) play(false);
         });
       };
       box.appendChild(b);
@@ -669,6 +690,7 @@
 
   // ------------------------------------------------------------------ 结算
   function finish() {
+    wantRun = false;
     pause();
     if (!S.over) { S.over = true; S.ending = E.evaluate(S); }
     S.over = true;
@@ -885,7 +907,7 @@
     $('#btn-theme').onclick = toggleTheme;
     if ($('#btn-theme-float')) $('#btn-theme-float').onclick = toggleTheme;
 
-    $('#btn-play').onclick = function () { running ? pause() : play(); };
+    $('#btn-play').onclick = function () { running ? stopPlay() : play(); };
     $('#btn-skip').onclick = skipToNode;
     $('#btn-auto').onclick = function () {
       autoDecide = !autoDecide;
@@ -912,7 +934,7 @@
     document.addEventListener('keydown', function (e) {
       if (!$('#s-play').classList.contains('active')) return;
       if (!$('#modal').hidden || !$('#about').hidden) return;
-      if (e.code === 'Space') { e.preventDefault(); running ? pause() : play(); return; }
+      if (e.code === 'Space') { e.preventDefault(); running ? stopPlay() : play(); return; }
       if (e.key >= '1' && e.key <= '6') {
         const id = D.focusOrder[parseInt(e.key, 10) - 1];
         const chip = $$('#chips .chip').find(function (c) { return c.dataset.id === id; });
