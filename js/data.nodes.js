@@ -293,7 +293,9 @@
     {
       id: 'n22', age: 22, title: '第一份工作',
       scene: function (S) {
-        return '毕业季。宿舍楼下的行李箱轮子声响了一整个星期，你投了 87 份简历，收到 4 个面试，2 个 offer。';
+        const ind = S.draw.industry, role = S.draw.role;
+        return '毕业季。宿舍楼下的行李箱轮子声响了一整个星期，你投了 87 份简历，收到 4 个面试，2 个 offer。' +
+          '要你的公司做的是「' + ind.name + '」，岗位写着「' + role.name + '」——' + ind.note + '。';
       },
       options: [
         { id: 'big', label: '去大厂 / 头部公司', hint: '钱多，但你是第 3000 号螺丝', show: function (S) { return ['本科', '硕士', '博士'].indexOf(S.draw.edu) >= 0; },

@@ -502,12 +502,22 @@
     return Math.round(6200 * (d.tier.salaryMul || 1) * edu.mul * d.industry.mul * d.role.mul *
       (1 + (S.stats.skill - 20) / 400));
   };
+  // 行业和岗位在出生时就定了，但直到第一份工作才揭晓
+  E.revealIndustry = function (S) {
+    if (S.flags.industryRevealed) return;
+    S.flags.industryRevealed = true;
+    S.log.push({
+      age: S.age, kind: 'life',
+      text: '你入行了：' + S.draw.industry.name + ' · ' + S.draw.role.name + '。' + S.draw.industry.note + '。',
+    });
+  };
   E.startWork = function (S) {
     const st = S.stats;
     const s0 = E.salary0(S);
     if (!st.salary || st.salary < s0) st.salary = s0;
     st.hours = S.draw.industry.hours;
     S.draw.salary0 = st.salary;
+    E.revealIndustry(S);
     return st.salary;
   };
 
@@ -719,6 +729,7 @@
       st.salary = Math.round(eff.startSalary * (S.draw.tier.salaryMul || 1));
       S.draw.salary0 = st.salary;
       st.hours = S.draw.industry.hours;
+      E.revealIndustry(S);
     }
     if (eff.vocWork) {
       S.flags.vocWork = true;

@@ -83,7 +83,7 @@
       ['家庭', d.family.name, d.family.note],
       ['学习底子', d.aptitude ? d.aptitude.name : '—', d.aptitude ? d.aptitude.note : ''],
       ['家里的钱', '¥' + fmtWan(d.family.cash0), '父母能拿出来的全部'],
-      ['行业 / 岗位', d.industry.name + ' · ' + d.role.name, d.industry.note],
+      ['将来的行业', '还不知道', '22 岁第一份工作时揭晓'],
       ['体质 / 性格', d.trait.name, d.trait.note],
     ];
     rows.forEach(function (r, i) {
@@ -468,8 +468,11 @@
     if (!S.peers) { box.innerHTML = ''; return; }
     box.innerHTML = S.peers.map(function (p, i) {
       const st = peerStatus(p, S.age);
+      const sub = S.age < META.gradAge
+        ? p.draw.tier.name + ' · ' + p.identity.gender + ' · ' + p.draw.family.name
+        : p.draw.tier.name + ' · ' + p.identity.gender + ' · ' + p.draw.industry.name;
       return '<div class="prow" data-i="' + i + '" role="button" tabindex="0"><span class="pn"><b>' + p.identity.name + '</b><span>' +
-        p.draw.tier.name + ' · ' + p.identity.gender + ' · ' + p.draw.industry.name + '</span></span>' +
+        sub + '</span></span>' +
         '<span class="ps">' + st + '</span></div>';
     }).join('');
     $$('#peer-list .prow').forEach(function (el) {
