@@ -113,6 +113,7 @@
     if (target <= S.age) target = Math.min(22, S.age + 1);
     const from = S.age;
     S.age = target;
+    S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
     S.log.push({ age: target, kind: 'flavor', text: from <= 18 ? '一年过去了。大一：军训、宿舍、食堂，还有四六级报名。' :
       (from === 19 ? '大学四年过去了。你记不清学会了什么，但记得住每个室友的呼噜声。' : '几年过去了。') });
     renderTopbar();

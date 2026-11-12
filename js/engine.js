@@ -299,6 +299,7 @@
     else if (st.spirit <= 0) { out.lines.push({ age, kind: 'bad', text: '你在某个周一早上没有起床，也没有请假。' }); S.over = true; S.ending = E.evaluate(S, 'burnout'); }
 
     S.age++;
+    S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
     return out;
   };
 
