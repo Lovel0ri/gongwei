@@ -1,0 +1,168 @@
+/* 工位 — 人生节点（岔路）
+ * 每个节点只提问，不解答。选项各自明码标价。
+ * special 由 engine 处理：exam / exam35 / house / kid / move / startup / freelance / retireEarly
+ */
+(function () {
+  const G = (typeof window !== 'undefined' ? window : globalThis);
+  const GW = G.GW = G.GW || {};
+  const D = GW.DATA = GW.DATA || {};
+
+  D.nodes = [
+    // ------------------------------------------------------------ 18
+    {
+      id: 'n18', age: 18, title: '志愿表',
+      scene: function (S) {
+        var sc = S.draw.score;
+        return '分数出来了：' + sc.name + '。' +
+          (sc.id === 'sn' ? '班主任在办公室里叹气，说"要不复读一年"。你妈在门外站着，没进来。' :
+           sc.id === 's985' ? '全省排名前千分之几。亲戚的电话开始多了起来。' :
+           '不高不低，刚好卡在一个需要认真选的分数上。志愿表只有一张，填错了没有撤销键。');
+      },
+      options: [
+        { id: 'hot', label: '冲热门：计算机 / 金融', hint: '起薪高，但四年后未必还是热门', show: function (S) { return ['s985', 's1', 's2'].indexOf(S.draw.score.id) >= 0; },
+          eff: { skill: 4, spirit: 2, majorGroup: 'hot' }, log: '你填了热门专业。你爸在饭桌上说"这个好，这个赚钱"。' },
+        { id: 'safe', label: '求稳：师范 / 医学 / 机械', hint: '起薪一般，路比较长', show: function (S) { return ['s985', 's1', 's2'].indexOf(S.draw.score.id) >= 0; },
+          eff: { skill: 2, spirit: 3, relation: 2, majorGroup: 'safe' }, log: '你填了稳妥的专业。你妈说"以后有个正经工作就行"。' },
+        { id: 'any', label: '能上什么上什么', hint: '服从调剂', eff: { skill: 0, spirit: -1, majorGroup: 'any' }, log: '你勾了"服从调剂"，最后被分到了一个你填志愿时没听过的专业。' },
+        { id: 'work', label: '不读了，出去打工', hint: '早四年入行，早四年被消耗', show: function (S) { return ['sz', 'sn'].indexOf(S.draw.score.id) >= 0; },
+          eff: { skill: -2, cash: 20000, health: -3, spirit: -2, earlyWork: true }, log: '你买了南下的火车票。站了 19 个小时，下车时觉得这座城市很高。' },
+      ],
+    },
+
+    // ------------------------------------------------------------ 19
+    {
+      id: 'n19', age: 19, title: '大学四年',
+      scene: function (S) {
+        return '宿舍六个人，四台电脑在打游戏，一台在写代码，一台在写小说。你的床在门边。';
+      },
+      options: [
+        { id: 'gpa', label: '卷绩点，冲保研/考研', hint: '用四年换一个更高的起点', jump: 3, eff: { skill: 6, spirit: -2, health: -2, flags: { gradPlan: true } }, log: '你在图书馆待到闭馆，四年里谈过一次恋爱，分手理由是你太忙。' },
+        { id: 'intern', label: '实习 + 社团，攒经历', hint: '简历比成绩单好看', jump: 3, eff: { skill: 3, relation: 6, spirit: 1, health: -1 }, log: '你做了三份实习，学会了两件事：怎么写周报，怎么在饭桌上不说话。' },
+        { id: 'lie', label: '躺平，打游戏，谈恋爱', hint: '青春只有一次', jump: 3, eff: { spirit: 6, skill: -2, health: 2, relation: -2 }, log: '你打了 2000 小时游戏，段位很高，成绩单很低。你不后悔，也不太敢回想。' },
+        { id: 'parttime', label: '兼职赚钱，给家里减负', hint: '懂事是一种天赋，也是一种损耗', jump: 3, eff: { cash: 40000, skill: 1, health: -2, spirit: -1, relation: 1 }, log: '你发过传单、做过家教、在奶茶店站过一整年。毕业时你比同学更会看人脸色。' },
+      ],
+    },
+
+    // ------------------------------------------------------------ 22
+    {
+      id: 'n22', age: 22, title: '第一份工作',
+      scene: function (S) {
+        return '毕业季。宿舍楼下的行李箱轮子声响了一整个星期，你投了 87 份简历，收到 4 个面试，2 个 offer。';
+      },
+      options: [
+        { id: 'big', label: '去大厂 / 头部公司', hint: '钱多，但你是第 3000 号螺丝', show: function (S) { return ['本科', '硕士', '博士'].indexOf(S.draw.edu) >= 0; },
+          eff: { salaryMul: 1.15, skill: 3, health: -3, relation: 1, flags: { bigCo: true } }, log: '你入职了一家名字很好听的公司，工牌上有一张不太像你的照片。' },
+        { id: 'sme', label: '去中小企业，什么都干', hint: '三个人的活，一个人的钱', eff: { salaryMul: 0.95, skill: 6, relation: 2, health: -2, flags: { sme: true } }, log: '你在一个 18 人的公司里做设计、做运营、修打印机。老板说"年轻人多学点"。' },
+        { id: 'exam', label: '考公 / 考编', hint: '上岸率是个位数', eff: { special: 'exam' }, log: '' },
+        { id: 'grad', label: '读研，再缓三年', hint: '学历通胀比工资快', show: function (S) { return S.draw.edu === '本科'; },
+          eff: { special: 'grad' }, log: '' },
+        { id: 'blue', label: '进厂 / 做服务业', hint: '不看学历，看体力', show: function (S) { return ['高中', '专科'].indexOf(S.draw.edu) >= 0; },
+          eff: { salaryMul: 0.92, skill: 3, health: -4, spirit: -2, flags: { blue: true } }, log: '你进了一家电子厂，或者一家连锁店。培训两天，第三天就上岗。' },
+      ],
+    },
+
+    // ------------------------------------------------------------ 26
+    {
+      id: 'n26', age: 26, title: '第一次跳槽',
+      scene: function (S) {
+        return '工作第四年。你开始能独立带一点东西，也开始发现，涨薪最快的方式是在别人的公司里涨。';
+      },
+      options: [
+        { id: 'jump', label: '跳一次，涨 28%', hint: '跳槽是普通人最快的加薪方式', eff: { salaryMul: 1.28, relation: -3, spirit: 3, health: -2, flags: { jobHopper: true } }, log: '你跳了。旧同事在群里说"羡慕"，三个月后他们也开始跳。' },
+        { id: 'stay', label: '原地熬晋升', hint: '慢，但攒的是资历', eff: { salaryMul: 1.12, relation: 4, skill: 2, spirit: -2 }, log: '你留下了，领导说"明年给你考虑"，你记下了这句话。' },
+        { id: 'pivot', label: '转行重开', hint: '工资腰斩，人重新活一遍', eff: { salaryMul: 0.68, skill: 7, spirit: 5, health: 1, pivot: true }, log: '你换了行业，从"资深"变回"新人"。第一周你笑得很久没这么轻松。' },
+      ],
+    },
+
+    // ------------------------------------------------------------ 29
+    {
+      id: 'n29', age: 29, title: '留不留下',
+      scene: function (S) {
+        return '你 29 岁了。房租每年涨，父母的电话开始从"吃饭了吗"变成"房子看了吗"。' +
+          (S.flags.partner ? '你们在一起三年，谈过一次首付，没谈拢。' : '你一个人住，冰箱里有半盒过期的酸奶。');
+      },
+      options: [
+        { id: 'buyBig', label: '留在大城市，买房', hint: '首付掏空，月供锁死三十年', special: 'house_big',
+          eff: { spirit: 2, relation: 3, health: -2 }, log: '' },
+        { id: 'backHome', label: '回省会 / 老家', hint: '工资降三成，房贷轻一半', special: 'house_small',
+          eff: { spirit: 1, relation: 2, health: 2 }, log: '' },
+        { id: 'rent', label: '不买了，租房过日子', hint: '把首付拿去买自由', eff: { spirit: 3, relation: -4, cash: 60000 }, log: '你继续租房，把钱存了下来。亲戚说你"想不通"，你说"嗯"。' },
+      ],
+    },
+
+    // ------------------------------------------------------------ 32
+    {
+      id: 'n32', age: 32, title: '生不生',
+      scene: function (S) {
+        return '32 岁。体检报告上"建议尽早"四个字，你看了很多遍。' +
+          (S.flags.partner ? '你们讨论过三次，每次都停在"再想想"。' : '你连讨论的对象都还没有，但催的人在变多。');
+      },
+      options: [
+        { id: 'kid', label: '生', hint: '钱、时间、心气，三样一起扣', special: 'kid', eff: { spirit: 2, relation: 3, health: -3 }, log: '' },
+        { id: 'nokid', label: '不生', hint: '轻松，但要扛住所有人的嘴', eff: { spirit: 4, relation: -5, cash: 40000 }, log: '你说"我们不打算要"。你妈沉默了三秒，然后说"你们自己决定"。' },
+        { id: 'later', label: '再等三年', hint: '身体成本会替你决定', eff: { spirit: 1, health: -2, flags: { kidLater: true } }, log: '你说"35 岁之前一定"。这句话你自己都不太信。' },
+      ],
+    },
+
+    // ------------------------------------------------------------ 35
+    {
+      id: 'n35', age: 35, title: '那道坎',
+      scene: function (S) {
+        return '35 岁。招聘网站上你熟悉的岗位，几乎都写着"35 岁以下"。' +
+          '你在公司的价值，从"潜力"变成了"成本"。';
+      },
+      options: [
+        { id: 'manager', label: '转管理', hint: '要关系，也要替别人背锅', show: function (S) { return S.stats.relation >= 38 && !S.flags.manager; },
+          eff: { salaryMul: 1.2, relation: 4, spirit: -4, health: -3, flags: { manager: true } }, log: '你带了一个 7 人小组。第一次开人被 HR 拦下，说你"流程不对"。' },
+        { id: 'expert', label: '死磕专家岗', hint: '要能力，也要赌行业不倒', show: function (S) { return S.stats.skill >= 45; },
+          eff: { salaryMul: 1.14, skill: 6, spirit: -2, flags: { expert: true } }, log: '你成了公司里"这块只有他懂"的人。代价是，你只能懂这块。' },
+        { id: 'exam35', label: '考编上岸', hint: '年龄窗口正在关闭', special: 'exam35', eff: {}, log: '' },
+        { id: 'startup', label: '创业 / 入伙', hint: '拿积蓄赌一次', show: function (S) { return S.stats.cash >= 150000; },
+          special: 'startup', eff: { spirit: 5, health: -4 }, log: '' },
+        { id: 'coast', label: '先躺一阵，别折腾', hint: '不动，也是一种选择', eff: { spirit: 2, health: 2, salaryMul: 0.97 }, log: '你决定不折腾了。那年你准点下班，体重涨了六斤，睡得挺好。' },
+      ],
+    },
+
+    // ------------------------------------------------------------ 40
+    {
+      id: 'n40', age: 40, title: '天花板',
+      scene: function (S) {
+        return '40 岁。你上面那个位置的人比你大 6 岁，他上面那个位置的人比他大 5 岁。你算了一下，轮到你的时候，你 51。';
+      },
+      options: [
+        { id: 'flat', label: '中层躺平，把日子过稳', hint: '不再往上，也不再被优化', eff: { spirit: -2, health: 3, salaryMul: 1.02 }, log: '你开始准点下班，开始钓鱼，开始在群里发早安。' },
+        { id: 'side2', label: '副业转正', hint: '把退路走成主路', special: 'freelance', eff: { spirit: 4, health: 2 }, log: '' },
+        { id: 'switch', label: '换赛道，从头学', hint: '40 岁当新人，需要脸皮', eff: { salaryMul: 0.82, skill: 6, spirit: 3, health: -2, pivot: true }, log: '你去了一个更小的行业、更小的公司，名片上的头衔降了一级。' },
+      ],
+    },
+
+    // ------------------------------------------------------------ 45
+    {
+      id: 'n45', age: 45, title: '行业下行',
+      scene: function (S) {
+        return '45 岁。行业不行了，不是你的错，但账算在你头上。公司开始"优化 40 岁以上中层"。';
+      },
+      options: [
+        { id: 'sink', label: '跟着公司沉', hint: '赌它不倒', eff: { salaryMul: 0.92, spirit: -6, relation: 2, flags: { sank: true } }, log: '你留下了。两年后公司裁到只剩三分之一，你还在，工资回到了 2019 年。' },
+        { id: 'leave', label: '提前撤，换行业', hint: '主动比被动体面', eff: { salaryMul: 0.78, skill: 5, spirit: 4, health: 1, pivot: true }, log: '你走了，去了一个不看年龄的行业。第一天上班，同事都比你小十岁。' },
+        { id: 'own', label: '被优化后自己干', hint: '开个小店 / 接私活', special: 'freelance', eff: { spirit: 3, health: -2 }, log: '' },
+      ],
+    },
+
+    // ------------------------------------------------------------ 52
+    {
+      id: 'n52', age: 52, title: '健康账单',
+      scene: function (S) {
+        return '52 岁。你的身体开始寄账单了：血压、血糖、颈椎、睡眠。医生说"这个年纪，正常"。';
+      },
+      options: [
+        { id: 'push', label: '再拼八年，熬到退休', hint: '钱重要，还是命重要', eff: { salaryMul: 1.06, health: -8, spirit: -3 }, log: '你继续加班，把药放在工位抽屉里，跟胃药放在一起。' },
+        { id: 'slow', label: '主动降速，少赚点', hint: '提前把命赎回来', eff: { salaryMul: 0.86, health: 9, spirit: 5, relation: 2 }, log: '你申请调去了清闲岗，工资降了两成，血压降了二十。' },
+        { id: 'sick', label: '身体已经不允许了', hint: '病退', show: function (S) { return S.stats.health < 45; },
+          eff: { special: 'retireEarly' }, log: '' },
+      ],
+    },
+  ];
+
+  D.nodeAges = { n18: 18, n19: 19, n22: 22, n26: 26, n29: 29, n32: 32, n35: 35, n40: 40, n45: 45, n52: 52 };
+})();

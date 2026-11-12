@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>工位 · 1 in 740 Million</title>
+<meta name="description" content="一个仿 1in8b.life 的中国职场模拟器。随机出生，随机入行，从 22 岁干到退休。">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div id="app">
+
+  <!-- ============================ 封面 -->
+  <section id="s-landing" class="screen active">
+    <div class="landing-inner">
+      <div class="kicker">职场模拟器 · 中国 · v0.2</div>
+      <h1 class="title">工位</h1>
+      <div class="subtitle">1 in 740 Million</div>
+      <p class="lede">
+        中国有约 7.4 亿就业人口。<br>
+        你被随机丢进其中一个工位，从 22 岁干到退休。<br>
+        中间只有九次真正能改命的岔路，其余时间你只是在选：<em>今年把命花在哪。</em>
+      </p>
+      <div class="landing-actions">
+        <button id="btn-start" class="btn primary">随机出生</button>
+        <button id="btn-load" class="btn ghost" hidden>继续上一条命</button>
+        <button id="btn-about" class="btn link">关于 / 数据来源</button>
+      </div>
+      <div class="landing-foot">一局约 40–45 分钟 · 无广告 · 不收集任何数据 · 存档只在你本地</div>
+    </div>
+  </section>
+
+  <!-- ============================ 抽签 -->
+  <section id="s-draw" class="screen">
+    <div class="panel draw-panel">
+      <div class="kicker">出生卡 · 你没法选</div>
+      <div id="draw-list" class="draw-list"></div>
+      <div class="draw-actions">
+        <button id="btn-begin" class="btn primary wide" disabled>开始这一生</button>
+      </div>
+      <div class="tiny" id="draw-hint">三秒后可以开始。</div>
+    </div>
+  </section>
+
+  <!-- ============================ 游戏 -->
+  <section id="s-play" class="screen">
+    <header class="topbar">
+      <div class="tb-left">
+        <span class="tb-logo">工位</span>
+        <span class="tb-age"><b id="tb-age">18</b><i>岁</i></span>
+        <span class="tb-meta"><span id="tb-year">2026 年</span> · <span id="tb-name">—</span> · 第 <span id="tb-nyear">1</span> 年</span>
+      </div>
+      <div class="tb-right">
+        <button id="btn-play" class="tbtn solid"><span id="play-ico">▶</span><span id="play-txt">继续</span></button>
+        <div class="speeds" id="speeds">
+          <button class="tbtn on" data-s="1">1×</button>
+          <button class="tbtn" data-s="2">2×</button>
+          <button class="tbtn" data-s="4">4×</button>
+          <button class="tbtn" data-s="8">8×</button>
+        </div>
+        <button id="btn-skip" class="tbtn">快进到下个抉择 »</button>
+        <button id="btn-auto" class="tbtn">自动抉择</button>
+        <button id="btn-about2" class="tbtn icon" title="关于">?</button>
+      </div>
+    </header>
+
+    <div class="board">
+      <!-- 左栏 -->
+      <aside class="col col-left">
+        <section class="card idcard">
+          <div class="idcard-head"><span>身份纪录 · <span id="id-region">CN</span></span><em id="id-year">2026</em></div>
+          <div class="idcard-body">
+            <div class="avatar-wrap"><canvas id="avatar" width="72" height="72"></canvas></div>
+            <div class="idcard-main">
+              <h2 id="id-name">—</h2>
+              <dl class="idfields" id="id-fields"></dl>
+            </div>
+          </div>
+          <div class="idcode" id="id-code">I&lt;CN</div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">状态 <em>0–100</em></div>
+          <div class="bars" id="stats-bars"></div>
+          <div class="stat-note">这些状态代表什么？
+            <span class="tip">健康归零会提前退场；心气归零会先于贫穷发生；自由是每周可支配的小时数。</span>
+          </div>
+        </section>
+
+        <section class="card finance">
+          <div class="fin-row"><span>净资产</span><b id="fin-net">—</b></div>
+          <div class="fin-row"><span>年收入</span><b id="fin-income">—</b></div>
+          <div class="fin-note">以中国大陆物价计</div>
+        </section>
+      </aside>
+
+      <!-- 中栏 -->
+      <main class="col col-center">
+        <section class="card scene">
+          <canvas id="scene" width="320" height="100"></canvas>
+          <div class="scene-cap" id="scene-cap">—</div>
+        </section>
+
+        <section class="card focuscard">
+          <div class="card-head">今年的重心 <em>随时可以改</em></div>
+          <div class="focus-sub" id="focus-sub">—</div>
+          <div class="chips" id="chips"></div>
+        </section>
+
+        <section class="card logcard">
+          <div class="card-head">人生纪录 <em>最新的在前 · 点一行加星</em></div>
+          <div class="log" id="log"></div>
+        </section>
+      </main>
+
+      <!-- 右栏 -->
+      <aside class="col col-right">
+        <section class="card">
+          <div class="card-head">家人与生活</div>
+          <div id="family-list" class="family-list"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">在同一秒出生的人们 <em>此刻，在同样的年纪</em></div>
+          <div id="peer-list" class="peer-list"></div>
+        </section>
+
+        <section class="card">
+          <div class="card-head">人生地图 <em>一格 = 1 年</em></div>
+          <div class="lifemap" id="lifemap"></div>
+          <div class="map-legend"><i class="g1"></i><i class="g2"></i><i class="g3"></i><i class="g4"></i><span>健康</span></div>
+        </section>
+      </aside>
+    </div>
+  </section>
+
+  <!-- ============================ 结算 -->
+  <section id="s-ending" class="screen">
+    <div class="ending-inner">
+      <div class="kicker">一生报表</div>
+      <h2 id="end-name" class="end-name">—</h2>
+      <p id="end-line" class="end-line"></p>
+      <div id="end-metrics" class="end-metrics"></div>
+
+      <div class="chart-block">
+        <div class="chart-title">四维终值</div>
+        <canvas id="radar" width="360" height="300"></canvas>
+      </div>
+
+      <div class="chart-block">
+        <div class="chart-title">一生三条线 <span class="legend"><i class="lg-money"></i>月薪 <i class="lg-health"></i>健康 <i class="lg-spirit"></i>心气</span></div>
+        <canvas id="lifeline" width="640" height="300"></canvas>
+      </div>
+
+      <div class="chart-block">
+        <div class="chart-title">同一天入职的五个人</div>
+        <div id="same-second" class="same-second"></div>
+        <div class="tiny">同一天入职，五种起点，五种结局。这不是巧合，是分布。</div>
+      </div>
+
+      <div class="end-actions">
+        <button id="btn-again" class="btn primary">再来一次</button>
+        <button id="btn-share" class="btn ghost">复制这一生</button>
+        <button id="btn-about3" class="btn link">数据来源</button>
+      </div>
+    </div>
+  </section>
+
+</div>
+
+<!-- ============================ 弹窗 -->
+<div id="modal" class="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true">
+    <div class="sheet-head">
+      <div class="kicker" id="m-kicker">节点</div>
+      <h3 id="m-title"></h3>
+    </div>
+    <div class="sheet-body">
+      <p id="m-scene" class="scene-text"></p>
+      <div id="m-options" class="options"></div>
+      <div id="m-result" class="result" hidden></div>
+    </div>
+    <div class="sheet-foot">
+      <button id="m-next" class="btn primary wide" hidden>继续</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ 关于 -->
+<div id="about" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div class="kicker">关于</div>
+      <h3>数据、边界与免责</h3>
+    </div>
+    <div class="sheet-body">
+      <p class="scene-text">《工位》是一个纯前端的职场模拟器，仿 1in8b.life 的结构：起点不可选，结局由真实分布推动。</p>
+      <div class="src-list" id="src-list"></div>
+      <p class="tiny" style="margin-top:16px;text-align:left">
+        所有数值为按公开统计标定的<strong>近似参数</strong>，用于模拟趋势，不构成任何收入、职业或投资建议。<br>
+        游戏中的抑郁、过劳、疾病只呈现结果，不描写细节。如果你正在经历类似的困境：<br>
+        中国大陆心理援助热线 <strong>12356</strong>（24 小时）· 北京心理危机研究与干预中心 <strong>010-82951332</strong>。
+      </p>
+    </div>
+    <div class="sheet-foot">
+      <button id="about-close" class="btn ghost wide">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/data.core.js"></script>
+<script src="js/data.events.js"></script>
+<script src="js/data.nodes.js"></script>
+<script src="js/engine.js"></script>
+<script src="js/sim.js"></script>
+<script src="js/ui.js"></script>
+</body>
+</html>
