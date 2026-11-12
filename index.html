@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>工位 · 1 in 740 Million</title>
-<meta name="description" content="一个仿 1in8b.life 的中国职场模拟器。随机出生，随机入行，从 22 岁干到退休。">
+<meta name="description" content="一个仿 1in8b.life 的中国人生模拟器。随机出生，从初一到退休，六年读书换一张志愿表。">
 <link rel="stylesheet" href="css/style.css">
 <script>
 (function () {
@@ -22,20 +22,22 @@
   <!-- ============================ 封面 -->
   <section id="s-landing" class="screen active">
     <div class="landing-inner">
-      <div class="kicker">职场模拟器 · 中国 · v0.2.3</div>
+      <div class="kicker">人生模拟器 · 中国 · v0.3.0</div>
       <h1 class="title">工位</h1>
       <div class="subtitle">1 in 740 Million</div>
       <p class="lede">
         中国有约 7.4 亿就业人口。<br>
-        你被随机丢进其中一个工位，从 22 岁干到退休。<br>
-        中间只有九次真正能改命的岔路，其余时间你只是在选：<em>今年把命花在哪。</em>
+        你被随机丢进其中一个家庭，从初一坐到退休。<br>
+        前六年你只干一件事：把成绩往上挪，换一张志愿表。<br>
+        之后还有十几次岔路，其余时间你只是在选：<em>今年把命花在哪。</em>
       </p>
       <div class="landing-actions">
         <button id="btn-start" class="btn primary">随机出生</button>
         <button id="btn-load" class="btn ghost" hidden>继续上一条命</button>
+        <button id="btn-gallery" class="btn ghost">结局图鉴</button>
         <button id="btn-about" class="btn link">关于 / 数据来源</button>
       </div>
-      <div class="landing-foot">一局约 40–45 分钟 · 无广告 · 不收集任何数据 · 存档只在你本地</div>
+      <div class="landing-foot">一局约 45 分钟 · 13 岁到 60 岁 · 无广告 · 不收集任何数据 · 存档只在你本地</div>
     </div>
   </section>
 
@@ -56,7 +58,7 @@
     <header class="topbar">
       <div class="tb-left">
         <span class="tb-logo">工位</span>
-        <span class="tb-age"><b id="tb-age">18</b><i>岁</i></span>
+        <span class="tb-age"><b id="tb-age">13</b><i>岁</i></span>
         <span class="tb-meta"><span id="tb-year">2026 年</span> · <span id="tb-name">—</span> · 第 <span id="tb-nyear">1</span> 年</span>
       </div>
       <div class="tb-right">
@@ -99,8 +101,8 @@
         </section>
 
         <section class="card finance">
-          <div class="fin-row"><span>净资产</span><b id="fin-net">—</b></div>
-          <div class="fin-row"><span>年收入</span><b id="fin-income">—</b></div>
+          <div class="fin-row"><span id="fin-net-k">净资产</span><b id="fin-net">—</b></div>
+          <div class="fin-row"><span id="fin-income-k">年收入</span><b id="fin-income">—</b></div>
           <div class="fin-note">以中国大陆物价计</div>
         </section>
       </aside>
@@ -149,6 +151,7 @@
   <section id="s-ending" class="screen">
     <div class="ending-inner">
       <div class="kicker">一生报表</div>
+      <div id="end-badge" class="end-badge" hidden>★ 新结局解锁</div>
       <h2 id="end-name" class="end-name">—</h2>
       <p id="end-line" class="end-line"></p>
       <div id="end-metrics" class="end-metrics"></div>
@@ -171,6 +174,7 @@
 
       <div class="end-actions">
         <button id="btn-again" class="btn primary">再来一次</button>
+        <button id="btn-gallery2" class="btn ghost">看结局图鉴</button>
         <button id="btn-share" class="btn ghost">复制这一生</button>
         <button id="btn-about3" class="btn link">数据来源</button>
       </div>
@@ -199,6 +203,41 @@
   </div>
 </div>
 
+<!-- ============================ 结局图鉴 -->
+<div id="gallery" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div class="kicker">结局图鉴 · <span id="gal-count">0 / 13</span></div>
+      <h3>你走到过的地方</h3>
+    </div>
+    <div class="sheet-body">
+      <div class="gal-grid" id="gal-grid"></div>
+      <p class="tiny" style="text-align:left;margin-top:14px">
+        这台设备上已经走完 <b id="gal-lives">0</b> 条命。图鉴只存在你本地，不上传。
+      </p>
+    </div>
+    <div class="sheet-foot">
+      <button id="gallery-close" class="btn ghost wide">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============================ 同秒的人 -->
+<div id="peer" class="modal" hidden>
+  <div class="sheet">
+    <div class="sheet-head">
+      <div class="kicker">同一秒出生的人</div>
+      <h3 id="peer-name">—</h3>
+    </div>
+    <div class="sheet-body">
+      <div id="peer-body"></div>
+    </div>
+    <div class="sheet-foot">
+      <button id="peer-close" class="btn ghost wide">关闭</button>
+    </div>
+  </div>
+</div>
+
 <!-- ============================ 关于 -->
 <div id="about" class="modal" hidden>
   <div class="sheet">
@@ -207,7 +246,8 @@
       <h3>数据、边界与免责</h3>
     </div>
     <div class="sheet-body">
-      <p class="scene-text">《工位》是一个纯前端的职场模拟器，仿 1in8b.life 的结构：起点不可选，结局由真实分布推动。</p>
+      <p class="scene-text">《工位》是一个纯前端的人生模拟器，仿 1in8b.life 的结构：起点不可选，结局由真实分布推动。<br>
+从 13 岁初一开始，前六年只有一件事在涨——成绩。它决定你中考去哪、高考能填什么，之后才轮到职场那套规则。</p>
       <div class="src-list" id="src-list"></div>
       <p class="tiny" style="margin-top:16px;text-align:left">
         所有数值为按公开统计标定的<strong>近似参数</strong>，用于模拟趋势，不构成任何收入、职业或投资建议。<br>

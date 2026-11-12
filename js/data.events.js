@@ -8,6 +8,118 @@
   const D = GW.DATA = GW.DATA || {};
 
   D.events = [
+    // ------------------------------------------------ 学生时代（13–18）
+    {
+      id: 'ev_note', tag: '教室', weight: 10, ageMin: 13, ageMax: 17,
+      title: '纸条被截了',
+      text: '你传的纸条在半路被班主任截住。她当着全班念了两句，然后问："谁写的？"',
+      options: [
+        { label: '站起来认了', desc: '丢脸，但干脆', eff: { acad: -2, relation: 4, spirit: 2 }, log: '你站起来说"我写的"。全班安静了两秒，后排有人小声说"牛"。' },
+        { label: '低头装傻', desc: '没人指认就没事', eff: { relation: -3, spirit: -3 }, log: '没有一个人说话。你趴了一整节课，后背全是汗。' },
+        { label: '说是别人写的', desc: '甩锅', eff: { relation: -6, acad: 1, spirit: -2 }, log: '你报了一个名字。那个人被叫去办公室，回来时没看你。' },
+      ],
+    },
+    {
+      id: 'ev_phone', tag: '教室', weight: 9, ageMin: 13, ageMax: 18,
+      title: '手机被没收',
+      text: '晚自习，你抽屉里的手机亮了。班主任从后门进来，直接伸手："拿出来。"',
+      options: [
+        { label: '交，认罚', desc: '写检查，期末还你', eff: { acad: 2, spirit: -2 }, log: '你交了上去，写了一份 800 字的检查，抄了三遍。' },
+        { label: '硬顶，说"凭啥"', desc: '有骨气，有代价', eff: { acad: -1, spirit: 4, relation: -5 }, log: '你顶了两句，然后被请了家长。你妈在办公室站了半小时。' },
+        { label: '偷偷再买一个', desc: '钱能解决的问题', eff: { cash: -800, acad: -2, spirit: 2 }, log: '你用压岁钱买了个二手机。第二周又被收了。' },
+      ],
+    },
+    {
+      id: 'ev_bully', tag: '教室', weight: 7, ageMin: 14, ageMax: 18,
+      title: '走廊尽头',
+      text: '课间，走廊尽头围了几个人，中间是你们班那个不太说话的男生。有人在推他。',
+      options: [
+        { label: '过去把人拉开', desc: '可能下一个是你', eff: { relation: 5, health: -4, spirit: 3 }, log: '你挤进去说"算了"。推人的那个看了你一眼，记住了你。' },
+        { label: '装作没看见', desc: '大多数人', eff: { spirit: -5, relation: -1 }, log: '你从旁边走过去。他抬头看了你一眼，你走得更快了。' },
+        { label: '去叫老师', desc: '最正确，最没面子', eff: { relation: -2, spirit: 2, acad: 1 }, log: '老师赶来了，人散了。第二天起，没人再跟你一起打球。' },
+      ],
+    },
+    {
+      id: 'ev_crush', tag: '教室', weight: 10, ageMin: 14, ageMax: 18,
+      title: '喜欢的人',
+      text: '你发现自己会算好时间，在楼梯口"偶遇"同一个人。你们说过的话加起来不到二十句。',
+      options: [
+        { label: '写封信，递过去', desc: '青春只有一次', eff: { spirit: 6, acad: -3, relation: 3 }, log: '你把信塞进了她的书里。三天后她回了四个字："先好好学习。"' },
+        { label: '憋着，等毕业再说', desc: '最安全，最遗憾', eff: { acad: 3, spirit: -3 }, log: '你憋了三年。毕业照上她站在第二排，你站在最后一排。' },
+        { label: '约着一起上晚自习', desc: '两个人一起卷', eff: { acad: 4, spirit: 4, relation: 4, health: -1 }, log: '你们成了同桌。你发现自己居然能坐住三小时，就为了给她讲一道题。' },
+      ],
+    },
+    {
+      id: 'ev_fee', tag: '家里', weight: 8, ageMin: 13, ageMax: 18,
+      title: '补课费',
+      text: '班主任在群里发通知：周末提高班，一门 1200，报三门打九折。你妈在厨房算了一遍，没说话。',
+      options: [
+        { label: '跟家里说"我不报了"', desc: '懂事的价格', eff: { acad: -4, relation: 3, spirit: -2 }, log: '你妈把那张纸折起来放进抽屉，说"咱不上那个"，然后多给了你十块零花。' },
+        { label: '报，钱家里想办法', desc: '把压力转给父母', eff: { cash: -3600, acad: 5, spirit: -1 }, log: '你报了名。你爸那个月多跑了两趟夜班，你后来才知道。' },
+        { label: '自己找同学抄笔记', desc: '不花钱的路子', eff: { acad: 2, relation: 2, spirit: 1 }, log: '你借了年级第一的笔记，抄了整整两个笔记本，字迹后来变得跟他一样。' },
+      ],
+    },
+    {
+      id: 'ev_rank', tag: '成绩', weight: 10, ageMin: 14, ageMax: 18,
+      title: '排名掉了',
+      text: '月考排名从 12 名掉到 28 名。家长会上，你妈坐在你的座位上，看了很久那张成绩单。',
+      options: [
+        { label: '从今天开始熬夜补', desc: '用命换分', eff: { acad: 5, health: -5, spirit: -2 }, log: '你开始十一点半睡，六点起。三个月后排名回来了，眼睛也近视了。' },
+        { label: '去找老师问哪块不行', desc: '方法比努力重要', eff: { acad: 4, relation: 2, spirit: 1 }, log: '数学老师给你画了三页知识图。你第一次觉得，成绩是可以拆开的。' },
+        { label: '算了，反正也追不上', desc: '认命', eff: { acad: -4, spirit: 3, health: 2 }, log: '你把成绩单签了字交回去。那天下午你睡了高中三年最踏实的一觉。' },
+      ],
+    },
+    {
+      id: 'ev_cheat', tag: '成绩', weight: 6, ageMin: 15, ageMax: 18,
+      title: '递过来的答案',
+      text: '期末考，隔壁桌把答题卡往你这边推了一点。他上次排第五，你排第二十七。',
+      options: [
+        { label: '抄了', desc: '分数是真的，能力是假的', eff: { acad: 3, spirit: -4, relation: -2 }, log: '你抄了。那次你进了前十，家长会上你妈第一次坐在了前排。' },
+        { label: '不抄，自己写', desc: '难，但干净', eff: { acad: 1, spirit: 3 }, log: '你把答题卡往自己这边挪了挪。那个学期你名次没变，但看题不慌了。' },
+        { label: '考完去举报', desc: '把别人也拉下水', eff: { acad: 0, relation: -7, spirit: 1 }, log: '你去了教务处。那男生被记了过，你们班那学期没人跟你说话。' },
+      ],
+    },
+    {
+      id: 'ev_netbar', tag: '放学后', weight: 7, ageMin: 13, ageMax: 17,
+      title: '网吧',
+      text: '放学后，几个人拉你去网吧，五块钱三个小时。老板看见你们，把烟按灭了，说"里面坐"。',
+      options: [
+        { label: '去，玩到天黑', desc: '快乐是真的', eff: { spirit: 5, acad: -3, health: -2, cash: -500 }, log: '你打到七点半，回家说是"在学校写作业"。你妈信了。' },
+        { label: '去，但只待一小时', desc: '自欺欺人', eff: { spirit: 2, acad: -1, cash: -500 }, log: '一小时后他们不放你走。你走的时候，他们在打最后一局。' },
+        { label: '不去，回家写作业', desc: '把无聊熬成优势', eff: { acad: 3, relation: -2, spirit: -1 }, log: '你回了家。第二天他们聊昨晚的战绩，你插不上话。' },
+      ],
+    },
+    {
+      id: 'ev_teacher', tag: '教室', weight: 6, ageMin: 13, ageMax: 18,
+      title: '班主任叫你去办公室',
+      text: '班主任把门关上，说："我不是批评你。我是觉得你这孩子，还能再往上走一点。"',
+      options: [
+        { label: '认真听，按她说的做', desc: '一个愿意管你的人', eff: { acad: 5, relation: 3, spirit: 2 }, log: '她给你排了一张表，每天做什么写得很细。你照做了一个学期。' },
+        { label: '点头，出门就忘', desc: '标准流程', eff: { acad: -1, spirit: 1 }, log: '你说了"知道了老师"，出门就把话交给了走廊的风。' },
+        { label: '反问"那您说我该考哪"', desc: '把老师问住', eff: { acad: 2, relation: 2, spirit: 3 }, log: '她愣了一下，说"你至少能上个一本"。这句话你记了十年。' },
+      ],
+    },
+    {
+      id: 'ev_summer', tag: '假期', weight: 6, ageMin: 15, ageMax: 18,
+      title: '暑假',
+      text: '两个月的暑假。有人在补课，有人在家里躺着，有人去工地和餐馆干活，一天 80。',
+      options: [
+        { label: '去打工，挣点钱', desc: '早一点知道钱是什么', eff: { cash: 6000, acad: -2, health: -3, relation: 2, skill: 1 }, log: '你在后厨站了四十天，学会了切菜和挨骂。开学时你的手比同学黑了一圈。' },
+        { label: '在家补课 / 预习', desc: '把暑假当第三个学期', eff: { acad: 6, spirit: -3, health: -2 }, log: '你把下学期的数学书翻完了。开学第一次考试，你提前二十分钟交卷。' },
+        { label: '躺着，睡到中午', desc: '最后一次这样的暑假', eff: { spirit: 5, health: 3, acad: -2 }, log: '你睡了两个月。八月底你突然有点慌，但离开学只剩三天了。' },
+      ],
+    },
+    {
+      id: 'ev_sport', tag: '操场', weight: 5, ageMin: 13, ageMax: 18,
+      title: '体育课',
+      text: '篮球场上你落地时踩到别人的脚，脚踝当场肿起来。同学说"没事吧"，你疼得说不出话。',
+      options: [
+        { label: '去医务室，请假一周', desc: '身体要紧', eff: { health: 2, acad: -2, spirit: 1 }, log: '你请了一周假，回来时落下了两章内容。' },
+        { label: '忍着，下午还有课', desc: '少年的逞强', eff: { health: -6, acad: 1, spirit: 2 }, log: '你瘸了半个月。现在下雨天，那只脚踝还会提醒你。' },
+        { label: '让家里带你去医院拍片', desc: '花钱买个安心', eff: { cash: -1200, health: -1, relation: 1 }, log: '片子显示骨裂。医生说"再晚来两天就麻烦了"，你妈一路没说话。' },
+      ],
+    },
+
     // ------------------------------------------------ 组织
     {
       id: 'ev_newboss', tag: '组织', weight: 9, once: true, ageMin: 23, ageMax: 55,

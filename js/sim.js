@@ -15,15 +15,38 @@
 
   // 某年龄应该弹出哪个节点（取最早未完成的、且 ≤ 当前年龄）
   Sim.nextNode = function (S) {
+    // 18 岁那年自动出分：分数由学力 + 学校 + 家庭推出来，不是抽的
+    if (S.age >= D.meta.schoolEnd && !S.draw.gaokaoDone &&
+      (S.flags.track === 'key' || S.flags.track === 'normal')) {
+      GW.Engine.rollGaokao(S);
+    }
     const list = (D.nodes || []).filter(function (n) { return !S.done[n.id] && n.age <= S.age; })
       .sort(function (a, b) { return a.age - b.age; });
     for (const n of list) {
+      if (n.when && !n.when(S)) { S.done[n.id] = true; continue; }
       if (n.id === 'n19' && S.draw.edu !== '本科') { S.done[n.id] = true; continue; }
       const vis = visibleOptions(n, S);
       if (!vis.length) { S.done[n.id] = true; continue; }
       return { node: n, options: vis };
     }
     return null;
+  };
+
+  // 学生阶段自动选重心（批量模拟用）
+  Sim.autoSchoolFocus = function (S, rnd) {
+    const st = S.stats;
+    const w = [];
+    function add(id, wgt) { w.push({ id: id, w: Math.max(0.05, wgt) }); }
+    add('study', 2.0 + (st.academic > 46 ? 1.2 : 0) + ((S.draw.family.help || 0) > 0.5 ? 0.6 : 0));
+    add('cram', st.academic > 40 && st.cash > 45000 ? 1.3 : 0.1);
+    add('play', 0.9 + (st.health < 55 ? 0.5 : 0));
+    add('love', S.age >= 14 ? 0.9 : 0.1);
+    add('earn', st.cash < 25000 ? 1.4 : 0.2);
+    add('game', 0.7 + (st.spirit < 40 ? 0.9 : 0));
+    let total = w.reduce(function (a, b) { return a + b.w; }, 0);
+    let r = rnd() * total;
+    for (const x of w) { r -= x.w; if (r <= 0) return x.id; }
+    return 'study';
   };
 
   // 自动选重心：带一点偏好，但基本随机
@@ -48,9 +71,12 @@
     // 避开明显亏的：优先有正收益的选项
     const scored = options.map(function (x) {
       const e = x.o.eff || {};
-      const score = (e.salaryMul ? (e.salaryMul - 1) * 40 : 0) + (e.cash || 0) / 50000 +
-        (e.skill || 0) * 0.3 + (e.health || 0) * 0.3 + (e.spirit || 0) * 0.3 + (e.relation || 0) * 0.2 +
-        (x.o.special ? 0.6 : 0) + rnd() * 1.5;
+      const sm = e.salaryMul ? Math.max(-1.5, Math.min(1.5, (e.salaryMul - 1) * 22)) : 0;
+      const cash = e.cash ? Math.max(-1.5, Math.min(1.5, e.cash / 60000)) : 0;
+      const score = sm + cash +
+        (e.acad || 0) * 0.28 + (e.skill || 0) * 0.2 + (e.health || 0) * 0.25 +
+        (e.spirit || 0) * 0.2 + (e.relation || 0) * 0.1 +
+        (x.o.special ? 0.3 : 0) + rnd() * 2.0;
       return { x: x, score: score };
     }).sort(function (a, b) { return b.score - a.score; });
     return scored[0].x;
@@ -68,7 +94,7 @@
     opts = opts || {};
     const rnd = S.rnd;
     let guard = 0;
-    while (!S.over && S.age < D.meta.retireAge && guard++ < 200) {
+    while (!S.over && S.age < D.meta.retireAge && guard++ < 320) {
       const n = Sim.nextNode(S);
       if (n) {
         const pick = opts.random && rnd() < 0.7
@@ -78,11 +104,30 @@
         if (res.redo) continue;
         if (res.jump) S.age += res.jump;
         if (S.over) break;
-        if (S.age < 22 && !S.done['n22']) continue;
-        if (S.age >= 22 && S.stats.salary === 0) E.startWork(S);
+        if (res.reopen) continue;
+        if (S.age < D.meta.gradAge && !S.done['n22']) continue;
+        if (S.age >= D.meta.gradAge && S.stats.salary === 0) E.startWork(S);
         continue;
       }
-      if (S.stats.salary === 0) E.startWork(S);
+      if (S.stats.salary === 0) {
+        if (S.age < D.meta.schoolEnd) {
+          if (S.flags.track === 'none') {
+            S.age = D.meta.schoolEnd;
+            S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
+            continue;
+          }
+          const sf = Sim.autoSchoolFocus(S, rnd);
+          const so = E.stepSchoolYear(S, sf);
+          if (so && so.event) E.applyEvent(S, so.event, Math.floor(rnd() * so.event.options.length));
+          continue;
+        }
+        if (S.age < D.meta.gradAge) {
+          S.age = D.meta.gradAge;
+          S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
+          continue;
+        }
+        E.startWork(S);
+      }
       const f = optsFocus(S, rnd);
       const out = E.stepYear(S, f);
       if (out && out.event) {
@@ -123,6 +168,8 @@
         identity: s.identity,
         draw: s.draw,
         ending: s.ending,
+        flags: s.flags,
+        stats: { cash: s.stats.cash, health: s.stats.health, spirit: s.stats.spirit, salary: s.stats.salary },
         statusLog: s.statusLog || {},
       });
     }

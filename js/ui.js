@@ -4,7 +4,7 @@
   const GW = G.GW, E = GW.Engine, D = GW.DATA, Sim = GW.Sim;
   const $ = (s) => document.querySelector(s);
   const $$ = (s) => Array.prototype.slice.call(document.querySelectorAll(s));
-  const KEY = 'gongwei.save.v1';
+  const KEY = 'gongwei.save.v2';
 
   let S = null;
   let running = false;
@@ -15,6 +15,19 @@
   let busy = false;
   let wantRun = false;   // 玩家是否希望时间继续流动（不因弹窗清掉）
   let autoStarted = false;
+
+  const META = D.meta;
+  function stage() {
+    if (!S) return 'work';
+    if (S.age < 15) return 'junior';
+    if (S.age < META.schoolEnd) return 'senior';
+    if (S.age < META.gradAge) return 'college';
+    return 'work';
+  }
+  // 正在上学的年份（会有"今年的重心"）
+  function isStudent() {
+    return !!S && S.stats.salary === 0 && S.age < META.schoolEnd && S.flags.track !== 'none';
+  }
 
   // ------------------------------------------------------------------ 主题
   const THEME_KEY = 'gongwei.theme';
@@ -68,12 +81,10 @@
       ['姓名', id.name + ' · ' + id.gender, id.birth + '出生'],
       ['出生地', d.tier.name + ' · ' + d.cityName, '生活成本 ×' + d.tier.cost.toFixed(2)],
       ['家庭', d.family.name, d.family.note],
-      ['高考分数', d.score.name, '决定了你能填什么，填不了什么'],
-      ['专业', '还没填', '18 岁那年决定'],
-      ['行业', d.industry.name, d.industry.note],
-      ['岗位', d.role.name, d.role.note],
+      ['学习底子', d.aptitude ? d.aptitude.name : '—', d.aptitude ? d.aptitude.note : ''],
+      ['家里的钱', '¥' + fmtWan(d.family.cash0), '父母能拿出来的全部'],
+      ['行业 / 岗位', d.industry.name + ' · ' + d.role.name, d.industry.note],
       ['体质 / 性格', d.trait.name, d.trait.note],
-      ['起点存款', '¥' + fmtWan(d.family.cash0), '家里能拿出来的全部'],
     ];
     rows.forEach(function (r, i) {
       const el = document.createElement('div');
@@ -85,13 +96,13 @@
     });
     const btn = $('#btn-begin');
     btn.disabled = true;
-    setTimeout(function () { btn.disabled = false; $('#draw-hint').textContent = '这一生只能走一次，没有存档点。'; }, 1100);
+    setTimeout(function () { btn.disabled = false; $('#draw-hint').textContent = '13 岁到 60 岁，十几个岔路口。这一生只能走一次。'; }, 1100);
   }
 
   // ------------------------------------------------------------------ 开局
   function beginLife() {
     if (!S.peers) S.peers = Sim.buildPeers(S.seed, 5);
-    focusSel = S.draw.edu === '本科' && S.age < 22 ? 'learn' : 'career';
+    focusSel = isStudent() ? 'study' : 'career';
     show('s-play');
     renderAll();
     bindChips();
@@ -105,18 +116,21 @@
     if (S.age >= D.meta.retireAge) return finish();
     const n = Sim.nextNode(S);
     if (n) { pause(); openNode(n.node, filterOptions(n.options)); return; }
-    if (S.age < 22) { fastForward(); renderAll(); save(); return tick(); }
+    if (isStudent()) { applySchoolYear(focusSel); return; }
+    if (S.age < D.meta.gradAge) { fastForward(); renderAll(); save(); return tick(); }
+    if (S.stats.salary === 0) E.startWork(S);
+    applyYear(focusSel);
   }
 
   function fastForward() {
     const ages = D.nodes.map(function (n) { return n.age; }).filter(function (a) { return a > S.age; });
-    let target = Math.min(22, ages.length ? Math.min.apply(null, ages) : 22);
-    if (target <= S.age) target = Math.min(22, S.age + 1);
+    let target = Math.min(D.meta.gradAge, ages.length ? Math.min.apply(null, ages) : D.meta.gradAge);
+    if (target <= S.age) target = Math.min(D.meta.gradAge, S.age + 1);
     const from = S.age;
     S.age = target;
     S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
-    S.log.push({ age: target, kind: 'flavor', text: from <= 18 ? '一年过去了。大一：军训、宿舍、食堂，还有四六级报名。' :
-      (from === 19 ? '大学四年过去了。你记不清学会了什么，但记得住每个室友的呼噜声。' : '几年过去了。') });
+    S.log.push({ age: target, kind: 'flavor', text: from <= 18 ? '一年过去了。' :
+      (from <= 21 ? '大学四年过去了。你记不清学会了什么，但记得住每个室友的呼噜声。' : '几年过去了。') });
     renderTopbar();
   }
 
@@ -125,8 +139,26 @@
     if (S.age >= D.meta.retireAge) return finish();
     const n = Sim.nextNode(S);
     if (n) { pause(); openNode(n.node, filterOptions(n.options)); return; }
-    if (S.age < 22) { fastForward(); renderAll(); save(); return; }
+    if (isStudent()) { applySchoolYear(focusSel); return; }
+    if (S.age < D.meta.gradAge) { fastForward(); renderAll(); save(); return; }
+    if (S.stats.salary === 0) E.startWork(S);
     applyYear(focusSel);
+  }
+
+  // ------------------------------------------------------------------ 学生的一年
+  function applySchoolYear(focusId) {
+    const out = E.stepSchoolYear(S, focusId);
+    const age = (out.lines && out.lines[0] && out.lines[0].age) || S.age - 1;
+    (out.lines || []).forEach(function (l) { S.log.push({ age: age, kind: l.kind, text: l.text }); });
+    const st = S.stats;
+    S.log.push({
+      age: age, kind: 'summary',
+      text: '成绩 ' + Math.round(st.academic) + ' · 心气 ' + Math.round(st.spirit) + ' · 家里的钱 ' + fmtMoney(st.cash),
+    });
+    renderAll();
+    save();
+    if (out.event) { pause(); openEvent(out.event, afterStep); return; }
+    afterStep();
   }
 
   function applyYear(focusId) {
@@ -157,15 +189,18 @@
     if (S.age >= D.meta.retireAge) return finish();
     const n = Sim.nextNode(S);
     if (n) { pause(); openNode(n.node, filterOptions(n.options)); return; }
-    // 第一次真正进入年度循环时，自动开始流动
-    if (!autoStarted && !running && S.age >= 22) {
+    // 第一次进入年度循环时，自动开始流动
+    if (!autoStarted && !running) {
       autoStarted = true;
       play();
     }
   }
 
   // ------------------------------------------------------------------ 计时器
-  function intervalMs() { return Math.round(7000 / speed); }
+  function intervalMs() {
+    const base = isStudent() ? (META.schoolTickMs || 4500) : (META.tickMs || 7000);
+    return Math.round(base / speed);
+  }
   function startTimer() {
     stopTimer();
     timer = setInterval(function () {
@@ -219,7 +254,13 @@
     while (!busy && !S.over && guard++ < 60) {
       if (Sim.nextNode(S)) break;
       if (S.age >= D.meta.retireAge) break;
-      if (S.age < 22) { fastForward(); continue; }
+      if (isStudent()) {
+        const so = E.stepSchoolYear(S, Sim.autoSchoolFocus(S, Math.random));
+        if (so.event) E.applyEvent(S, so.event, 0);
+        continue;
+      }
+      if (S.age < D.meta.gradAge) { fastForward(); continue; }
+      if (S.stats.salary === 0) E.startWork(S);
       const out = E.stepYear(S, Sim.autoFocus(S, Math.random));
       const age = (out.lines && out.lines[0] && out.lines[0].age) || S.age - 1;
       (out.lines || []).forEach(function (l) { S.log.push({ age: age, kind: l.kind, text: l.text }); });
@@ -250,25 +291,28 @@
 
   function renderTopbar() {
     $('#tb-age').textContent = S.age;
-    $('#tb-year').textContent = ((D.meta.startYear || 2026) + (S.age - 18)) + ' 年';
+    $('#tb-year').textContent = S.year + ' 年';
     $('#tb-name').textContent = S.identity.name;
-    $('#tb-nyear').textContent = S.age >= 22 ? (S.age - 21) : '—';
+    $('#tb-nyear').textContent = (S.age - D.meta.startAge + 1);
   }
 
   function renderIdCard() {
     const d = S.draw, id = S.identity;
     $('#id-region').textContent = S.region;
-    $('#id-year').textContent = (D.meta.startYear || 2026) + (S.age - 18);
+    $('#id-year').textContent = S.year;
     $('#id-name').textContent = id.name;
-    const eduNow = S.age < 22 ? (S.draw.edu === '高中' ? '高中' : S.draw.edu + '在读') : (S.flags.civil ? '体制内' : S.draw.edu);
+    const working = S.stats.salary > 0;
     const fields = [
       ['性别', id.gender],
       ['出生', id.birth],
       ['居住', d.cityName],
       ['家庭', d.family.name.length > 6 ? d.family.name.slice(0, 6) : d.family.name],
-      ['学历', eduNow],
-      ['行业', S.age < 22 ? '未入职' : d.industry.name],
-      ['岗位', S.age < 22 ? '无' : d.role.name],
+      ['学历', E.eduText(S)],
+      ...(working
+        ? [['专业', d.major.name]]
+        : [['学校', S.flags.schoolName || (S.age < 15 ? '片区初中' : '—')]]),
+      ['行业', working ? d.industry.name : '未入职'],
+      ['岗位', working ? d.role.name : '—'],
       ['气质', d.trait.name],
     ];
     $('#id-fields').innerHTML = fields.map(function (f) {
@@ -291,36 +335,82 @@
   function renderStats() {
     const st = S.stats;
     const cashPct = st.cash <= 0 ? 0 : clamp((Math.log10(Math.max(st.cash, 1000)) - 4) / 3 * 100, 0, 100);
+    const school = S.stats.salary === 0 && S.age < META.schoolEnd;
+    const third = school
+      ? bar('成绩', st.academic, 'var(--blue)')
+      : bar('能力', st.skill, 'var(--blue)');
     $('#stats-bars').innerHTML =
       bar('健康', st.health, 'var(--green)') +
       bar('心气', st.spirit, 'var(--amber)') +
-      bar('能力', st.skill, 'var(--blue)') +
+      third +
       bar('关系', st.relation, 'var(--rel)') +
-      bar('现金', st.cash <= 0 ? 0 : cashPct, 'var(--cash)', cashPct, fmtMoney(st.cash))
-        .replace('class="bar-row', 'class="bar-row') +
+      bar(school ? '家底' : '现金', st.cash <= 0 ? 0 : cashPct, 'var(--cash)', cashPct, fmtMoney(st.cash)) +
       bar('自由', st.freedom, 'var(--free)', clamp(st.freedom / 75 * 100, 0, 100), Math.round(st.freedom) + 'h');
+    const note = $('.stat-note');
+    if (note) {
+      note.firstChild.nodeValue = school ? '这些状态代表什么？' : '这些状态代表什么？';
+      const tip = note.querySelector('.tip');
+      if (tip) tip.textContent = school
+        ? '成绩是高考的唯一变量，六年里每年选一次怎么过。心气归零会先于成绩发生；家底是父母能拿出来的钱。'
+        : '健康归零会提前退场；心气归零会先于贫穷发生；自由是每周可支配的小时数。';
+    }
   }
 
   function renderFinance() {
-    $('#fin-net').textContent = fmtMoney(E.netWorth(S));
-    $('#fin-income').textContent = S.stats.salary ? fmtMoney(E.annualIncome(S)) : '—';
+    const school = S.stats.salary === 0 && S.age < META.schoolEnd;
+    const k1 = $('#fin-net-k'), k2 = $('#fin-income-k'), note = $('.fin-note');
+    if (k1) k1.textContent = school ? '家里的钱' : '净资产';
+    if (k2) k2.textContent = school ? '今年支出' : '年收入';
+    if (note) note.textContent = school ? '以中国大陆物价计 · 学费与生活费' : '以中国大陆物价计';
+    $('#fin-net').textContent = fmtMoney(school ? S.stats.cash : E.netWorth(S));
+    $('#fin-income').textContent = school ? fmtMoney((S.fin && S.fin.schoolCost) || 0) : (S.stats.salary ? fmtMoney(E.annualIncome(S)) : '—');
   }
 
+  function focusList() {
+    if (isStudent()) return D.focusSchoolOrder.map(function (id) { return D.focusSchool[id]; });
+    return D.focusOrder.map(function (id) { return D.focus[id]; });
+  }
+  function focusTags(id) {
+    if (isStudent()) {
+      const f = D.focusSchool[id];
+      if (!f) return [];
+      const sg = function (n) { return (n > 0 ? '+' : '−') + (Math.abs(n) % 1 ? Math.abs(n).toFixed(1) : Math.abs(n)); };
+      const out = [];
+      if (f.acad) out.push('成绩' + sg(f.acad));
+      if (f.cash) out.push((f.cash > 0 ? '钱+' : '钱−') + fmtWan(Math.abs(f.cash)));
+      if (f.health) out.push('健康' + sg(f.health));
+      if (f.spirit) out.push('心气' + sg(f.spirit));
+      return out.slice(0, 3);
+    }
+    return D.focusTags[id] || [];
+  }
   function renderFocus() {
-    const stage = S.age < 19 ? '高中' : S.age < 22 ? '大学' : S.status || (S.flags.civil ? '体制内' : '在职');
-    $('#focus-sub').textContent = S.age + ' 岁 · ' + (S.age < 22 ? '读书' : S.draw.industry.name) + ' · ' + S.draw.cityName;
+    const list = focusList();
+    if (!list.some(function (f) { return f.id === focusSel; })) focusSel = list[0].id;
+    const st = isStudent() ? '读书' : (S.flags.civil ? '体制内' : (S.flags.freelance ? '自由职业' : '在职'));
+    let sub = S.age + ' 岁 · ' + st + ' · ' +
+      (isStudent() ? (S.flags.schoolName || '初中') : S.draw.industry.name) + ' · ' + S.draw.cityName;
+    if (isStudent()) {
+      const acad = Math.round(S.stats.academic);
+      sub += ' · 成绩 ' + acad;
+      if (S.age < 15) sub += '（重点高中线 44 · 普高线 28）';
+      else if (S.flags.track === 'key' || S.flags.track === 'normal') sub += '（本科线约 55 · 一本约 70，满分 100）';
+    }
+    $('#focus-sub').textContent = sub;
+    const head = $('.focuscard .card-head em');
+    if (head) head.textContent = isStudent() ? '每年选一次，成绩靠它' : '随时可以改';
     const box = $('#chips');
     box.innerHTML = '';
-    D.focusOrder.forEach(function (id) {
-      const f = D.focus[id];
-      const tags = D.focusTags[id] || [];
+    list.forEach(function (f) {
+      const tags = focusTags(f.id);
       const b = document.createElement('button');
-      b.className = 'chip' + (focusSel === id ? ' sel' : '');
-      b.dataset.id = id;
+      b.className = 'chip' + (focusSel === f.id ? ' sel' : '');
+      b.dataset.id = f.id;
       b.innerHTML = f.icon + ' ' + f.name + '<span class="ce">' + tags.join(' ') + '</span>';
       b.onclick = function () {
-        focusSel = id;
-        $$('#chips .chip').forEach(function (x) { x.classList.toggle('sel', x.dataset.id === id); });
+        if (busy) return;
+        focusSel = f.id;
+        $$('#chips .chip').forEach(function (x) { x.classList.toggle('sel', x.dataset.id === f.id); });
         if (!running) stepOnce();
       };
       box.appendChild(b);
@@ -347,35 +437,72 @@
 
   function renderFamily() {
     const id = S.identity;
+    const grow = S.age - D.meta.startAge;
     let html = '';
     id.parents.forEach(function (p) {
       html += '<div class="frow"><span class="fk">' + p.role + '</span><span class="fv"><b>' + p.name +
-        ' · ' + (p.age + (S.age - 18)) + ' 岁</b><em>' + p.rel + ' · ' + p.job + '</em></span></div>';
+        ' · ' + (p.age + grow) + ' 岁</b><em>' + p.rel + ' · ' + p.job + '</em></span></div>';
     });
     html += '<div class="frow"><span class="fk">兄弟姊妹</span><span class="fv"><b>' +
       (id.siblings ? id.siblings + ' 个' : '无') + '</b><em>' +
-      (S.flags.partner ? '有伴侣' : (S.age >= 26 ? '单身' : '还没到这步')) + '</em></span></div>';
+      (S.flags.partner ? '有伴侣' : (S.age >= 27 ? '单身' : '还没到这步')) + '</em></span></div>';
     html += '<div class="frow"><span class="fk">房子</span><span class="fv"><b>' +
       (S.flags.house ? '有房' : (S.flags.soldHouse ? '卖掉了' : '没有')) + '</b><em>' +
       (S.flags.kids ? '孩子 ' + S.flags.kids + ' 个' : '没有孩子') + '</em></span></div>';
     $('#family-list').innerHTML = html;
   }
 
+  function peerStatus(p, age) {
+    const log = p.statusLog || {};
+    if (log[age]) return log[age];
+    let best = null, bestAge = -1;
+    for (const k in log) {
+      const a = +k;
+      if (a <= age && a > bestAge) { bestAge = a; best = log[k]; }
+    }
+    return best || '上学';
+  }
+
   function renderPeers() {
     const box = $('#peer-list');
     if (!S.peers) { box.innerHTML = ''; return; }
-    box.innerHTML = S.peers.map(function (p) {
-      const st = (p.statusLog && (p.statusLog[S.age] || p.statusLog[22])) || '上学';
-      return '<div class="prow"><span class="pn"><b>' + p.identity.name + '</b><span>' +
+    box.innerHTML = S.peers.map(function (p, i) {
+      const st = peerStatus(p, S.age);
+      return '<div class="prow" data-i="' + i + '" role="button" tabindex="0"><span class="pn"><b>' + p.identity.name + '</b><span>' +
         p.draw.tier.name + ' · ' + p.identity.gender + ' · ' + p.draw.industry.name + '</span></span>' +
         '<span class="ps">' + st + '</span></div>';
     }).join('');
+    $$('#peer-list .prow').forEach(function (el) {
+      el.onclick = function () { openPeer(+el.dataset.i); };
+    });
+  }
+
+  function openPeer(i) {
+    const p = (S.peers || [])[i];
+    if (!p) return;
+    const m = $('#peer');
+    const e = p.ending || {};
+    const mt = p.metrics || (p.history && p.history.length ? {} : {});
+    const rows = [
+      ['出生', p.draw.tier.name + ' · ' + p.draw.cityName],
+      ['家庭', p.draw.family.name],
+      ['学历', p.draw.edu + (p.flags && p.flags.track ? '（' + (D.schoolTracks[p.flags.track] || {}).name + '）' : '')],
+      ['行业', p.draw.industry.name + ' · ' + p.draw.role.name],
+      ['结局', '「' + (e.name || '—') + '」'],
+      ['终值', '存款 ' + fmtMoney((p.stats && p.stats.cash) || 0) + ' · 健康 ' + Math.round((p.stats && p.stats.health) || 0) +
+        ' · 心气 ' + Math.round((p.stats && p.stats.spirit) || 0)],
+    ];
+    $('#peer-name').textContent = p.identity.name + ' · ' + p.identity.gender;
+    $('#peer-body').innerHTML = rows.map(function (r) {
+      return '<div class="src-row"><div class="k">' + r[0] + '</div><div class="v">' + r[1] + '</div></div>';
+    }).join('') + (e.line ? '<p class="scene-text" style="margin-top:14px">' + e.line + '</p>' : '');
+    m.hidden = false;
   }
 
   function renderMap() {
     const box = $('#lifemap');
     if (!box.children.length) {
-      for (let a = 22; a <= 59; a++) {
+      for (let a = D.meta.startAge; a < D.meta.retireAge; a++) {
         const el = document.createElement('i');
         el.className = 'lm future';
         el.dataset.age = a;
@@ -386,7 +513,10 @@
       const a = +el.dataset.age;
       const h = S.history.find(function (x) { return x.age === a; });
       el.className = 'lm' + (a === S.age ? ' now' : '');
-      if (!h) { el.classList.add('future'); el.style.background = ''; return; }
+      if (!h) {
+        if (a < S.age) { el.classList.add('na'); el.style.background = ''; return; }
+        el.classList.add('future'); el.style.background = ''; return;
+      }
       el.style.background = h.health > 70 ? 'var(--green)' : h.health > 50 ? '#a3a45f' : h.health > 30 ? '#c08a4e' : 'var(--red)';
     });
   }
@@ -394,10 +524,11 @@
   function renderScene() {
     const cv = $('#scene');
     drawScene(cv, S);
-    const st = S.age < 22 ? '上学' : (S.flags.civil ? '体制内' : (S.flags.freelance ? '自由职业' : '上班')) ;
+    const st = E.statusOf(S);
+    const grow = S.age - D.meta.startAge;
     $('#scene-cap').innerHTML = S.draw.tier.name + ' · ' + (D.sceneDesc[S.draw.tier.id] || '') +
-      '<em>你（' + S.age + ' 岁）· ' + st + ' · 父亲 ' + (S.identity.parents[0].age + S.age - 18) + ' 岁 · 母亲 ' +
-      (S.identity.parents[1].age + S.age - 18) + ' 岁</em>';
+      '<em>你（' + S.age + ' 岁）· ' + st + ' · 父亲 ' + (S.identity.parents[0].age + grow) + ' 岁 · 母亲 ' +
+      (S.identity.parents[1].age + grow) + ' 岁</em>';
   }
 
   // ------------------------------------------------------------------ 主题色
@@ -587,6 +718,31 @@
   function hex(c) { return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)]; }
 
   // ------------------------------------------------------------------ 节点 / 事件
+  function effectText(eff) {
+    if (!eff) return '';
+    const out = [];
+    const sg = function (n) { return (n > 0 ? '+' : '−') + Math.abs(n); };
+    if (eff.acad) out.push('成绩' + sg(eff.acad));
+    if (eff.skill) out.push('能力' + sg(eff.skill));
+    if (eff.health) out.push('健康' + sg(eff.health));
+    if (eff.spirit) out.push('心气' + sg(eff.spirit));
+    if (eff.relation) out.push('关系' + sg(eff.relation));
+    if (eff.cash) out.push((eff.cash > 0 ? '钱+' : '钱−') + fmtWan(Math.abs(eff.cash)));
+    if (eff.salaryMul) out.push('月薪' + (eff.salaryMul >= 1 ? '+' : '−') + Math.round(Math.abs(eff.salaryMul - 1) * 100) + '%');
+    if (eff.track) out.push('→ ' + ((D.schoolTracks[eff.track] || {}).name || eff.track));
+    if (eff.edu) out.push('→ ' + eff.edu);
+    if (eff.startSalary) out.push('起薪 ¥' + eff.startSalary);
+    if (eff.majorGroup) out.push('专业重抽');
+    if (eff.special) out.push('要赌一次');
+    if (eff.flags) {
+      if (eff.flags.partner) out.push('有伴侣');
+      if (eff.flags.manager) out.push('转管理');
+      if (eff.flags.freelance) out.push('自由职业');
+      if (eff.flags.startup) out.push('创业');
+    }
+    return out.join(' · ');
+  }
+
   function filterOptions(opts) {
     return opts.filter(function (x) {
       if (S.flags.examFailed && x.o.eff && x.o.eff.special === 'exam' && S.age <= 24) return false;
@@ -604,10 +760,13 @@
     $('#m-result').hidden = true; $('#m-result').innerHTML = '';
     $('#m-next').hidden = true;
     const box = $('#m-options'); box.innerHTML = ''; box.hidden = false;
-    options.forEach(function (x) {
+    options.forEach(function (x, i) {
       const b = document.createElement('button');
       b.className = 'opt';
-      b.innerHTML = '<div class="t">' + x.o.label + '</div>' + (x.o.hint ? '<div class="h">' + x.o.hint + '</div>' : '');
+      const cost = effectText(x.o.eff);
+      b.innerHTML = '<div class="t"><span class="num">' + (i + 1) + '</span>' + x.o.label + '</div>' +
+        (x.o.hint ? '<div class="h">' + x.o.hint + '</div>' : '') +
+        (cost ? '<div class="cost">' + cost + '</div>' : '');
       b.onclick = function () { pickNodeOption(node, x); };
       box.appendChild(b);
     });
@@ -631,8 +790,11 @@
         if (n) { openNode(n.node, filterOptions(n.options)); return; }
       }
       if (res.jump && !res.redo) S.age += res.jump;
+      if (S.draw.gaokaoDone && S.flags.track !== 'voc' && S.flags.track !== 'tech' && S.flags.track !== 'none') {
+        S.flags.schoolName = (D.schoolTracks[S.flags.track] || {}).name || S.flags.schoolName;
+      }
       closeModal();
-      if (S.stats.salary === 0 && S.age >= 22) E.startWork(S);
+      if (S.stats.salary === 0 && S.age >= D.meta.gradAge) E.startWork(S);
       if (res.redo) {
         const n2 = Sim.nextNode(S);
         if (n2) { openNode(n2.node, filterOptions(n2.options)); return; }
@@ -655,7 +817,10 @@
     ev.options.forEach(function (o, i) {
       const b = document.createElement('button');
       b.className = 'opt';
-      b.innerHTML = '<div class="t">' + o.label + '</div>' + (o.desc ? '<div class="h">' + o.desc + '</div>' : '');
+      const cost = effectText(o.eff);
+      b.innerHTML = '<div class="t"><span class="num">' + (i + 1) + '</span>' + o.label + '</div>' +
+        (o.desc ? '<div class="h">' + o.desc + '</div>' : '') +
+        (cost ? '<div class="cost">' + cost + '</div>' : '');
       b.onclick = function () {
         $$('.opt').forEach(function (x) { x.disabled = true; });
         const r = E.applyEvent(S, ev, i);
@@ -729,19 +894,34 @@
 
   function closeModal() { $('#modal').hidden = true; busy = false; }
 
+  // 自动抉择：把当前开着的弹窗按随机选项推走
+  function autoResolveModal(delay) {
+    setTimeout(function () {
+      if (!autoDecide || $('#modal').hidden) return;
+      const opts = $$('#m-options .opt').filter(function (b) { return !b.disabled; });
+      if (opts.length) { opts[Math.floor(Math.random() * opts.length)].click(); return; }
+      const next = $('#m-next');
+      if (next && !next.hidden) next.click();
+    }, delay || 500);
+  }
+
   // ------------------------------------------------------------------ 结算
   function finish() {
     wantRun = false;
     pause();
     if (!S.over) { S.over = true; S.ending = E.evaluate(S); }
     S.over = true;
-    renderEnding();
+    const fresh = recordEnding((S.ending || {}).id || 'default');
+    renderGallery();
+    renderEnding(fresh);
     show('s-ending');
     localStorage.removeItem(KEY);
   }
 
-  function renderEnding() {
+  function renderEnding(fresh) {
     const en = S.ending || E.evaluate(S);
+    const badge = $('#end-badge');
+    if (badge) { badge.hidden = !fresh; }
     $('#end-name').textContent = '「' + en.name + '」';
     $('#end-line').textContent = en.line;
     const m = E.metrics(S);
@@ -877,6 +1057,40 @@
     });
   }
 
+  // ------------------------------------------------------------------ 结局图鉴
+  const GAL_KEY = 'gongwei.gallery.v1';
+  function loadGallery() {
+    try { return JSON.parse(localStorage.getItem(GAL_KEY) || '{}'); } catch (e) { return {}; }
+  }
+  function saveGallery(g) { try { localStorage.setItem(GAL_KEY, JSON.stringify(g)); } catch (e) {} }
+  function recordEnding(id) {
+    const g = loadGallery();
+    g.endings = g.endings || {};
+    const fresh = !g.endings[id];
+    g.endings[id] = (g.endings[id] || 0) + 1;
+    g.lives = (g.lives || 0) + 1;
+    saveGallery(g);
+    return fresh;
+  }
+  function renderGallery() {
+    const g = loadGallery();
+    const ids = g.endings || {};
+    const n = Object.keys(ids).length;
+    const box = $('#gal-grid');
+    if (!box) return;
+    box.innerHTML = D.endings.map(function (e) {
+      const c = ids[e.id] || 0;
+      return '<div class="gal-row' + (c ? ' got' : '') + '">' +
+        '<div class="gk">' + (c ? e.name : '？？？') + '</div>' +
+        '<div class="gv">' + (c ? e.line : '还没走到过这个结局') + '</div>' +
+        '<div class="gn">' + (c ? '×' + c : '') + '</div></div>';
+    }).join('');
+    const cnt = $('#gal-count'); if (cnt) cnt.textContent = n + ' / ' + D.endings.length;
+    const lives = $('#gal-lives'); if (lives) lives.textContent = (g.lives || 0);
+    const btn = $('#btn-gallery');
+    if (btn) btn.textContent = '结局图鉴 · ' + n + '/' + D.endings.length;
+  }
+
   // ------------------------------------------------------------------ 存档
   function save() {
     if (!S || S.over) return;
@@ -895,15 +1109,15 @@
       const raw = localStorage.getItem(KEY);
       if (!raw) return false;
       const o = JSON.parse(raw);
+      if (!o || !o.draw || !o.draw.aptitude) { localStorage.removeItem(KEY); return false; }
       const rnd = E.mulberry32(1);
       rnd.setState(o.rndState || 1);
       o.rnd = rnd;
       S = o;
       if (!S.peers) S.peers = Sim.buildPeers(S.seed, 5);
-      focusSel = 'career';
       show('s-play');
+      focusSel = isStudent() ? 'study' : 'career';
       renderAll();
-      if (S.age < 22) focusSel = 'learn';
       renderFocus();
       tick();
       return true;
@@ -915,7 +1129,8 @@
     const m = E.metrics(S);
     const en = S.ending || {};
     return '《工位》1 in 740 Million\n' +
-      '我抽到了：' + S.draw.tier.name + ' · ' + S.draw.family.name + ' · ' + S.draw.industry.name + ' · ' + S.draw.edu + '\n' +
+      '我抽到了：' + S.draw.tier.name + ' · ' + S.draw.family.name + ' · ' + S.draw.industry.name + '\n' +
+      '学历：' + S.draw.edu + (S.gaokaoScore ? '（高考 ' + S.gaokaoScore + ' 分）' : '') + '\n' +
       '结局：「' + en.name + '」\n' +
       '存款 ' + fmtMoney(m.cash) + '｜健康 ' + m.health + '｜心气 ' + m.spirit + '｜能力 ' + m.skill + '\n' +
       '晋升 ' + m.promotions + ' 次，被裁 ' + m.layoffs + ' 次。';
@@ -953,7 +1168,11 @@
     $('#btn-auto').onclick = function () {
       autoDecide = !autoDecide;
       $('#btn-auto').classList.toggle('on', autoDecide);
-      if (autoDecide && !busy && running) stepOnce();
+      if (autoDecide) {
+        // 弹窗已经打开时打开自动抉择，也要把它接走
+        autoResolveModal(500);
+        if (!busy && running) stepOnce();
+      }
     };
     $$('#speeds .tbtn').forEach(function (b) {
       b.onclick = function () {
@@ -969,15 +1188,44 @@
       if (el) el.onclick = function () { renderSources(); $('#about').hidden = false; };
     });
     $('#about-close').onclick = function () { $('#about').hidden = true; };
+    const openGallery = function () { renderGallery(); $('#gallery').hidden = false; };
+    const gal = $('#btn-gallery');
+    if (gal) gal.onclick = openGallery;
+    const gal2 = $('#btn-gallery2');
+    if (gal2) gal2.onclick = openGallery;
+    const galClose = $('#gallery-close');
+    if (galClose) galClose.onclick = function () { $('#gallery').hidden = true; };
+    const peerClose = $('#peer-close');
+    if (peerClose) peerClose.onclick = function () { $('#peer').hidden = true; };
+    renderGallery();
 
     document.querySelector('.stat-note').onclick = function () { this.classList.toggle('open'); };
 
     document.addEventListener('keydown', function (e) {
+      // 弹窗里：数字选选项，空格 / 回车继续
+      if (!$('#modal').hidden) {
+        if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
+          const next = $('#m-next');
+          if (next && !next.hidden) { e.preventDefault(); next.click(); return; }
+        }
+        if (e.key >= '1' && e.key <= '9') {
+          const opts = $$('#m-options .opt');
+          const idx = parseInt(e.key, 10) - 1;
+          if (opts[idx] && !opts[idx].disabled) { e.preventDefault(); opts[idx].click(); }
+        }
+        return;
+      }
+      if (!$('#about').hidden || !$('#gallery').hidden || !$('#peer').hidden) {
+        if (e.key === 'Escape') {
+          $('#about').hidden = true; $('#gallery').hidden = true; $('#peer').hidden = true;
+        }
+        return;
+      }
       if (!$('#s-play').classList.contains('active')) return;
-      if (!$('#modal').hidden || !$('#about').hidden) return;
       if (e.code === 'Space') { e.preventDefault(); running ? stopPlay() : play(); return; }
+      const order = isStudent() ? D.focusSchoolOrder : D.focusOrder;
       if (e.key >= '1' && e.key <= '6') {
-        const id = D.focusOrder[parseInt(e.key, 10) - 1];
+        const id = order[parseInt(e.key, 10) - 1];
         const chip = $$('#chips .chip').find(function (c) { return c.dataset.id === id; });
         if (chip) chip.click();
       }
