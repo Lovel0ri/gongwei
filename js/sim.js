@@ -8,7 +8,10 @@
 
   function visibleOptions(node, S) {
     return node.options.map(function (o, i) { return { o: o, i: i }; }).filter(function (x) {
-      return !x.o.show || x.o.show(S);
+      if (x.o.show && !x.o.show(S)) return false;
+      var sp = x.o.special || (x.o.eff && x.o.eff.special);
+      if (S.flags.examFailed && (sp === 'exam' || sp === 'exam35')) return false;
+      return true;
     });
   }
   Sim.visibleOptions = visibleOptions;
@@ -102,12 +105,13 @@
           ? n.options[Math.floor(rnd() * n.options.length)]
           : Sim.autoPickNode(S, n.options, rnd);
         const res = E.applyNodeOption(S, n.node.id, pick.i);
+        // 先入职再处理 redo，和浏览器端保持一致
+        if (S.stats.salary === 0 && S.age >= D.meta.gradAge) E.startWork(S);
         if (res.redo) continue;
-        if (res.jump) S.age += res.jump;
+        if (res.jump) E.setAge(S, S.age + res.jump);
         if (S.over) break;
         if (res.reopen) continue;
         if (S.age < D.meta.gradAge && !S.done['n22']) continue;
-        if (S.age >= D.meta.gradAge && S.stats.salary === 0) E.startWork(S);
         continue;
       }
       if (S.stats.salary === 0) {

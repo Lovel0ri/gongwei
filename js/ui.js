@@ -15,6 +15,8 @@
   let busy = false;
   let wantRun = false;   // 玩家是否希望时间继续流动（不因弹窗清掉）
   let autoStarted = false;
+  let modalGen = 0;          // 每次开弹窗 +1，旧定时器用它判断自己是否过期
+  let overlayWasRunning = false;
 
   const META = D.meta;
   function stage() {
@@ -41,8 +43,17 @@
     if (top) { top.textContent = icon; top.title = t === 'light' ? '切换到暗色' : '切换到亮色'; }
     const flo = $('#btn-theme-float');
     if (flo) { flo.textContent = label; flo.title = t === 'light' ? '切换到暗色' : '切换到亮色'; }
+    redrawForTheme();
   }
   function toggleTheme() { applyTheme(currentTheme() === 'light' ? 'dark' : 'light'); }
+  function redrawForTheme() {
+    if (!S) return;
+    if ($('#s-play').classList.contains('active')) {
+      renderScene();
+      drawAvatar($('#avatar'), S.identity);
+    }
+    if (S.over && $('#s-ending').classList.contains('active')) renderEnding(false);
+  }
 
   // ------------------------------------------------------------------ utils
   function fmtWan(n) {
@@ -59,6 +70,42 @@
     for (let i = 0; i < str.length; i++) { h ^= str.charCodeAt(i); h = Math.imul(h, 16777619); }
     return h >>> 0;
   }
+  function setInert(on) {
+    const app = document.getElementById('app');
+    if (app) app.inert = !!on;
+  }
+  function focusables(root) {
+    if (!root) return [];
+    return Array.prototype.slice.call(root.querySelectorAll(
+      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+    )).filter(function (el) { return !el.disabled && el.offsetParent !== null; });
+  }
+  function trapTab(e, root) {
+    const f = focusables(root);
+    if (!f.length) return;
+    const first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+  // 覆盖层（关于 / 图鉴 / 同秒的人）：打开时暂停，关闭时恢复
+  function openOverlay(id) {
+    const el = $(id);
+    if (!el) return;
+    overlayWasRunning = running;
+    if (running) pause();
+    el.hidden = false;
+    setInert(true);
+    const btn = el.querySelector('.sheet-foot .btn');
+    if (btn) btn.focus();
+  }
+  function closeOverlay(id) {
+    const el = $(id);
+    if (!el) return;
+    el.hidden = true;
+    setInert(false);
+    if (overlayWasRunning) { overlayWasRunning = false; play(false); }
+  }
+
   function show(id) {
     $$('.screen').forEach(function (el) { el.classList.toggle('active', el.id === id); });
     document.body.classList.toggle('playing', id === 's-play');
@@ -67,6 +114,8 @@
 
   // ------------------------------------------------------------------ 抽签
   function newGame() {
+    if (hasSave() && !confirm('开始新的一生会覆盖当前存档，继续？')) return;
+    wantRun = false; running = false; stopTimer(); busy = false; autoStarted = false;
     const seed = ((Date.now() ^ Math.floor(Math.random() * 4294967296)) >>> 0);
     S = E.createLife(seed);
     renderDraw();
@@ -115,15 +164,16 @@
     if (busy || !S || S.over) return;
     if (S.age >= D.meta.retireAge) return finish();
     const n = Sim.nextNode(S);
-    if (n) { pause(); openNode(n.node, filterOptions(n.options)); return; }
+    if (n) { pause(); openNode(n.node, n.options); return; }
     if (isStudent()) { applySchoolYear(focusSel); return; }
-    if (S.age < D.meta.gradAge) { fastForward(); renderAll(); save(); return tick(); }
+    if (S.age < D.meta.gradAge && S.stats.salary === 0) { fastForward(); renderAll(); save(); return tick(); }
     if (S.stats.salary === 0) E.startWork(S);
     applyYear(focusSel);
   }
 
   function fastForward() {
-    const ages = D.nodes.map(function (n) { return n.age; }).filter(function (a) { return a > S.age; });
+    const ages = D.nodes.filter(function (n) { return n.age > S.age && (!n.when || n.when(S)); })
+      .map(function (n) { return n.age; });
     let target = Math.min(D.meta.gradAge, ages.length ? Math.min.apply(null, ages) : D.meta.gradAge);
     if (target <= S.age) target = Math.min(D.meta.gradAge, S.age + 1);
     const from = S.age;
@@ -138,9 +188,9 @@
     if (busy || !S || S.over) return;
     if (S.age >= D.meta.retireAge) return finish();
     const n = Sim.nextNode(S);
-    if (n) { pause(); openNode(n.node, filterOptions(n.options)); return; }
+    if (n) { pause(); openNode(n.node, n.options); return; }
     if (isStudent()) { applySchoolYear(focusSel); return; }
-    if (S.age < D.meta.gradAge) { fastForward(); renderAll(); save(); return; }
+    if (S.age < D.meta.gradAge && S.stats.salary === 0) { fastForward(); renderAll(); save(); return; }
     if (S.stats.salary === 0) E.startWork(S);
     applyYear(focusSel);
   }
@@ -188,7 +238,7 @@
     if (S.over) return finish();
     if (S.age >= D.meta.retireAge) return finish();
     const n = Sim.nextNode(S);
-    if (n) { pause(); openNode(n.node, filterOptions(n.options)); return; }
+    if (n) { pause(); openNode(n.node, n.options); return; }
     // 第一次进入年度循环时，自动开始流动
     if (!autoStarted && !running) {
       autoStarted = true;
@@ -335,7 +385,7 @@
   function renderStats() {
     const st = S.stats;
     const cashPct = st.cash <= 0 ? 0 : clamp((Math.log10(Math.max(st.cash, 1000)) - 4) / 3 * 100, 0, 100);
-    const school = S.stats.salary === 0 && S.age < META.schoolEnd;
+    const school = isStudent();
     const third = school
       ? bar('成绩', st.academic, 'var(--blue)')
       : bar('能力', st.skill, 'var(--blue)');
@@ -357,7 +407,7 @@
   }
 
   function renderFinance() {
-    const school = S.stats.salary === 0 && S.age < META.schoolEnd;
+    const school = isStudent();
     const k1 = $('#fin-net-k'), k2 = $('#fin-income-k'), note = $('.fin-note');
     if (k1) k1.textContent = school ? '家里的钱' : '净资产';
     if (k2) k2.textContent = school ? '今年支出' : '年收入';
@@ -411,7 +461,7 @@
         if (busy) return;
         focusSel = f.id;
         $$('#chips .chip').forEach(function (x) { x.classList.toggle('sel', x.dataset.id === f.id); });
-        if (!running) stepOnce();
+        save();
       };
       box.appendChild(b);
     });
@@ -477,6 +527,9 @@
     }).join('');
     $$('#peer-list .prow').forEach(function (el) {
       el.onclick = function () { openPeer(+el.dataset.i); };
+      el.onkeydown = function (e) {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openPeer(+el.dataset.i); }
+      };
     });
   }
 
@@ -499,7 +552,7 @@
     $('#peer-body').innerHTML = rows.map(function (r) {
       return '<div class="src-row"><div class="k">' + r[0] + '</div><div class="v">' + r[1] + '</div></div>';
     }).join('') + (e.line ? '<p class="scene-text" style="margin-top:14px">' + e.line + '</p>' : '');
-    m.hidden = false;
+    openOverlay('#peer');
   }
 
   function renderMap() {
@@ -721,8 +774,10 @@
   function hex(c) { return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)]; }
 
   // ------------------------------------------------------------------ 节点 / 事件
-  function effectText(eff) {
-    if (!eff) return '';
+  function effectText(opt) {
+    if (!opt) return '';
+    const eff = opt.eff || {};
+    const sp = opt.special || eff.special;
     const out = [];
     const sg = function (n) { return (n > 0 ? '+' : '−') + Math.abs(n); };
     if (eff.acad) out.push('成绩' + sg(eff.acad));
@@ -736,7 +791,7 @@
     if (eff.edu) out.push('→ ' + eff.edu);
     if (eff.startSalary) out.push('起薪 ¥' + eff.startSalary);
     if (eff.majorGroup) out.push('专业重抽');
-    if (eff.special) {
+    if (sp) {
       const SP = {
         exam: '上岸率 < 10%', exam35: '年龄窗口只剩两年', grad: '多读三年',
         house_big: '首付 + 30 年房贷', house_small: '回省会，工资降',
@@ -745,7 +800,7 @@
         override_obey: '关系 +5 · 心气 −7', override_fight: '50% 被发现',
         override_teacher: '花 8,000 · 成功率 72%',
       };
-      out.push(SP[eff.special] || '要赌一次');
+      out.push(SP[sp] || '要赌一次');
     }
     if (eff.flags) {
       if (eff.flags.partner) out.push('有伴侣');
@@ -756,16 +811,17 @@
     return out.join(' · ');
   }
 
-  function filterOptions(opts) {
-    return opts.filter(function (x) {
-      if (S.flags.examFailed && x.o.eff && x.o.eff.special === 'exam' && S.age <= 24) return false;
-      return true;
-    });
-  }
-
   function openNode(node, options) {
     busy = true; pause();
     renderAll();
+    const gen = ++modalGen;
+    setInert(true);
+    let resolved = false;
+    const choose = function (x) {
+      if (resolved || !x) return;
+      resolved = true;
+      pickNodeOption(node, x);
+    };
     const m = $('#modal'); m.hidden = false;
     $('#m-kicker').textContent = '抉择 · ' + S.age + ' 岁';
     $('#m-title').textContent = node.title;
@@ -776,19 +832,19 @@
     options.forEach(function (x, i) {
       const b = document.createElement('button');
       b.className = 'opt';
-      const cost = effectText(x.o.eff);
+      const cost = effectText(x.o);
       b.innerHTML = '<div class="t"><span class="num">' + (i + 1) + '</span>' + x.o.label + '</div>' +
         (x.o.hint ? '<div class="h">' + x.o.hint + '</div>' : '') +
         (cost ? '<div class="cost">' + cost + '</div>' : '');
-      b.onclick = function () { pickNodeOption(node, x); };
+      b.onclick = function () { choose(x); };
       box.appendChild(b);
     });
     if (autoDecide) setTimeout(function () {
-      if ($('#modal').hidden) return;
+      if (gen !== modalGen || $('#modal').hidden || resolved) return;
       const vis = options.filter(function () { return true; });
-      const pick = vis[Math.floor(Math.random() * vis.length)];
-      pickNodeOption(node, pick);
+      choose(vis[Math.floor(Math.random() * vis.length)]);
     }, 900);
+    setTimeout(function () { const b = box.querySelector('.opt'); if (b) b.focus(); }, 0);
   }
 
   function pickNodeOption(node, x) {
@@ -800,9 +856,9 @@
     showResult(res.lines || [], function () {
       if (res.reopen) {
         const n = Sim.nextNode(S);
-        if (n) { openNode(n.node, filterOptions(n.options)); return; }
+        if (n) { openNode(n.node, n.options); return; }
       }
-      if (res.jump && !res.redo) S.age += res.jump;
+      if (res.jump && !res.redo) E.setAge(S, S.age + res.jump);
       if (S.draw.gaokaoDone && S.flags.track !== 'voc' && S.flags.track !== 'tech' && S.flags.track !== 'none') {
         S.flags.schoolName = (D.schoolTracks[S.flags.track] || {}).name || S.flags.schoolName;
       }
@@ -810,7 +866,7 @@
       if (S.stats.salary === 0 && S.age >= D.meta.gradAge) E.startWork(S);
       if (res.redo) {
         const n2 = Sim.nextNode(S);
-        if (n2) { openNode(n2.node, filterOptions(n2.options)); return; }
+        if (n2) { openNode(n2.node, n2.options); return; }
       }
       afterStep();
       if (wantRun && !busy && !S.over) play(false);
@@ -820,6 +876,9 @@
   function openEvent(ev, done) {
     busy = true; pause();
     renderAll();
+    const gen = ++modalGen;
+    setInert(true);
+    let resolved = false;
     const m = $('#modal'); m.hidden = false;
     $('#m-kicker').textContent = '事件 · ' + (ev.tag || '');
     $('#m-title').textContent = ev.title;
@@ -830,11 +889,13 @@
     ev.options.forEach(function (o, i) {
       const b = document.createElement('button');
       b.className = 'opt';
-      const cost = effectText(o.eff);
+      const cost = effectText(o);
       b.innerHTML = '<div class="t"><span class="num">' + (i + 1) + '</span>' + o.label + '</div>' +
         (o.desc ? '<div class="h">' + o.desc + '</div>' : '') +
         (cost ? '<div class="cost">' + cost + '</div>' : '');
       b.onclick = function () {
+        if (resolved) return;
+        resolved = true;
         $$('.opt').forEach(function (x) { x.disabled = true; });
         const r = E.applyEvent(S, ev, i);
         (r.lines || []).forEach(function (l) { S.log.push({ age: S.age, kind: l.kind, text: l.text }); });
@@ -848,11 +909,12 @@
       box.appendChild(b);
     });
     if (autoDecide) setTimeout(function () {
-      if ($('#modal').hidden) return;
+      if (gen !== modalGen || $('#modal').hidden || resolved) return;
       const idx = Math.floor(Math.random() * ev.options.length);
       const btn = $$('.opt')[idx];
       if (btn && !btn.disabled) btn.click();
     }, 900);
+    setTimeout(function () { const b = box.querySelector('.opt'); if (b) b.focus(); }, 0);
   }
 
   function showResult(lines, next, secs) {
@@ -905,12 +967,13 @@
     if (autoDecide) setTimeout(go, 600);
   }
 
-  function closeModal() { $('#modal').hidden = true; busy = false; }
+  function closeModal() { $('#modal').hidden = true; busy = false; setInert(false); }
 
   // 自动抉择：把当前开着的弹窗按随机选项推走
   function autoResolveModal(delay) {
+    const gen = modalGen;
     setTimeout(function () {
-      if (!autoDecide || $('#modal').hidden) return;
+      if (gen !== modalGen || !autoDecide || $('#modal').hidden) return;
       const opts = $$('#m-options .opt').filter(function (b) { return !b.disabled; });
       if (opts.length) { opts[Math.floor(Math.random() * opts.length)].click(); return; }
       const next = $('#m-next');
@@ -921,13 +984,14 @@
   // ------------------------------------------------------------------ 结算
   function finish() {
     wantRun = false;
+    autoStarted = false;
     pause();
     if (!S.over) { S.over = true; S.ending = E.evaluate(S); }
     S.over = true;
     const fresh = recordEnding((S.ending || {}).id || 'default');
     renderGallery();
-    renderEnding(fresh);
     show('s-ending');
+    requestAnimationFrame(function () { renderEnding(fresh); });
     localStorage.removeItem(KEY);
   }
 
@@ -1073,7 +1137,12 @@
   // ------------------------------------------------------------------ 结局图鉴
   const GAL_KEY = 'gongwei.gallery.v1';
   function loadGallery() {
-    try { return JSON.parse(localStorage.getItem(GAL_KEY) || '{}'); } catch (e) { return {}; }
+    try {
+      const g = JSON.parse(localStorage.getItem(GAL_KEY) || '{}');
+      if (!g || typeof g !== 'object' || Array.isArray(g)) return {};
+      if (!g.endings || typeof g.endings !== 'object' || Array.isArray(g.endings)) g.endings = {};
+      return g;
+    } catch (e) { return {}; }
   }
   function saveGallery(g) { try { localStorage.setItem(GAL_KEY, JSON.stringify(g)); } catch (e) {} }
   function recordEnding(id) {
@@ -1111,30 +1180,51 @@
       const copy = {};
       for (const k in S) if (k !== 'rnd') copy[k] = S[k];
       copy.rndState = S.rnd && S.rnd.getState ? S.rnd.getState() : 0;
+      copy.focusSel = focusSel;
       localStorage.setItem(KEY, JSON.stringify(copy));
     } catch (e) {}
   }
   function hasSave() {
     try { return !!localStorage.getItem(KEY); } catch (e) { return false; }
   }
+  function validSave(o) {
+    return !!o && typeof o === 'object' && !o.over && o.identity && o.draw && o.draw.aptitude &&
+      o.stats && o.flags && o.done && typeof o.age === 'number' && isFinite(o.age) &&
+      Array.isArray(o.log) && Array.isArray(o.history);
+  }
   function loadSave() {
+    let o = null;
     try {
       const raw = localStorage.getItem(KEY);
       if (!raw) return false;
-      const o = JSON.parse(raw);
-      if (!o || !o.draw || !o.draw.aptitude) { localStorage.removeItem(KEY); return false; }
+      o = JSON.parse(raw);
+    } catch (e) { o = null; }
+    if (!validSave(o)) {
+      try { localStorage.removeItem(KEY); } catch (e) {}
+      S = null;
+      return false;
+    }
+    try {
       const rnd = E.mulberry32(1);
       rnd.setState(o.rndState || 1);
       o.rnd = rnd;
       S = o;
       if (!S.peers) S.peers = Sim.buildPeers(S.seed, 5);
+      wantRun = false; running = false; stopTimer(); busy = false; autoStarted = true;
       show('s-play');
-      focusSel = isStudent() ? 'study' : 'career';
+      focusSel = o.focusSel || (isStudent() ? 'study' : 'career');
       renderAll();
       renderFocus();
-      tick();
+      // 读档不替玩家推进一年：有未决节点就打开它，否则停在暂停状态
+      const n = Sim.nextNode(S);
+      if (n) openNode(n.node, n.options);
+      else pause();
       return true;
-    } catch (e) { return false; }
+    } catch (e) {
+      S = null;
+      try { localStorage.removeItem(KEY); } catch (e2) {}
+      return false;
+    }
   }
 
   // ------------------------------------------------------------------ 分享
@@ -1165,11 +1255,27 @@
     $('#btn-start').onclick = newGame;
     $('#btn-begin').onclick = beginLife;
     $('#btn-again').onclick = function () { S = null; newGame(); };
+    const copyText = function (t) {
+      if (navigator.clipboard && navigator.clipboard.writeText) return navigator.clipboard.writeText(t);
+      return new Promise(function (resolve, reject) {
+        try {
+          const ta = document.createElement('textarea');
+          ta.value = t; ta.setAttribute('readonly', '');
+          ta.style.position = 'fixed'; ta.style.top = '-1000px'; ta.style.opacity = '0';
+          document.body.appendChild(ta); ta.select();
+          const ok = document.execCommand('copy');
+          document.body.removeChild(ta);
+          ok ? resolve() : reject(new Error('copy failed'));
+        } catch (err) { reject(err); }
+      });
+    };
     $('#btn-share').onclick = function () {
       const t = shareText();
-      if (navigator.clipboard) navigator.clipboard.writeText(t).then(function () {
+      copyText(t).then(function () {
         $('#btn-share').textContent = '已复制';
         setTimeout(function () { $('#btn-share').textContent = '复制这一生'; }, 1600);
+      }).catch(function () {
+        window.prompt('复制下面这段：', t);
       });
     };
     $('#btn-load').onclick = function () { if (!loadSave()) alert('存档读取失败'); };
@@ -1200,25 +1306,36 @@
 
     ['btn-about', 'btn-about2', 'btn-about3'].forEach(function (id) {
       const el = document.getElementById(id);
-      if (el) el.onclick = function () { renderSources(); $('#about').hidden = false; };
+      if (el) el.onclick = function () { renderSources(); openOverlay('#about'); };
     });
-    $('#about-close').onclick = function () { $('#about').hidden = true; };
-    const openGallery = function () { renderGallery(); $('#gallery').hidden = false; };
+    $('#about-close').onclick = function () { closeOverlay('#about'); };
+    const openGallery = function () {
+      try { renderGallery(); } catch (e) { /* 图鉴损坏时不影响游戏 */ }
+      openOverlay('#gallery');
+    };
     const gal = $('#btn-gallery');
     if (gal) gal.onclick = openGallery;
     const gal2 = $('#btn-gallery2');
     if (gal2) gal2.onclick = openGallery;
     const galClose = $('#gallery-close');
-    if (galClose) galClose.onclick = function () { $('#gallery').hidden = true; };
+    if (galClose) galClose.onclick = function () { closeOverlay('#gallery'); };
     const peerClose = $('#peer-close');
-    if (peerClose) peerClose.onclick = function () { $('#peer').hidden = true; };
-    renderGallery();
+    if (peerClose) peerClose.onclick = function () { closeOverlay('#peer'); };
+    try { renderGallery(); } catch (e) {}
 
     document.querySelector('.stat-note').onclick = function () { this.classList.toggle('open'); };
 
     document.addEventListener('keydown', function (e) {
+      // 覆盖层：Esc 关闭，Tab 圈在层里
+      const overlay = ['#about', '#gallery', '#peer'].find(function (id) { return !$(id).hidden; });
+      if (overlay) {
+        if (e.key === 'Escape') { e.preventDefault(); closeOverlay(overlay); return; }
+        if (e.key === 'Tab') { trapTab(e, $(overlay + ' .sheet')); return; }
+        return;
+      }
       // 弹窗里：数字选选项，空格 / 回车继续
       if (!$('#modal').hidden) {
+        if (e.key === 'Tab') { trapTab(e, document.querySelector('#modal .sheet')); return; }
         if (e.key === ' ' || e.key === 'Enter' || e.key === 'ArrowRight') {
           const next = $('#m-next');
           if (next && !next.hidden) { e.preventDefault(); next.click(); return; }
@@ -1230,20 +1347,30 @@
         }
         return;
       }
-      if (!$('#about').hidden || !$('#gallery').hidden || !$('#peer').hidden) {
-        if (e.key === 'Escape') {
-          $('#about').hidden = true; $('#gallery').hidden = true; $('#peer').hidden = true;
-        }
-        return;
-      }
       if (!$('#s-play').classList.contains('active')) return;
-      if (e.code === 'Space') { e.preventDefault(); running ? stopPlay() : play(); return; }
+      const t = e.target;
+      const interactive = t && (t.tagName === 'BUTTON' || t.tagName === 'A' ||
+        t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
+      if (e.code === 'Space') {
+        if (interactive) return;             // 让按钮自己响应空格
+        e.preventDefault(); running ? stopPlay() : play(); return;
+      }
+      if (interactive) return;
       const order = isStudent() ? D.focusSchoolOrder : D.focusOrder;
       if (e.key >= '1' && e.key <= '6') {
         const id = order[parseInt(e.key, 10) - 1];
         const chip = $$('#chips .chip').find(function (c) { return c.dataset.id === id; });
         if (chip) chip.click();
       }
+    });
+
+    // 结算页在窗口尺寸变化后重画（canvas 依赖 clientWidth）
+    let resizeTimer = null;
+    window.addEventListener('resize', function () {
+      clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(function () {
+        if (S && S.over && $('#s-ending').classList.contains('active')) renderEnding(false);
+      }, 180);
     });
 
     renderSources();

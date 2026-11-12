@@ -128,7 +128,7 @@
       options: [
         { label: '第二天就去单独汇报', desc: '先站队，后干活', eff: { relation: 7, spirit: -3, cash: 0 }, log: '你在新领导办公室待了四十分钟，出来时笑得很标准。' },
         { label: '先观察三个月', desc: '不站队，也不掉队', eff: { relation: 1, spirit: -1 }, log: '你决定让子弹飞一会儿，子弹飞了三年。' },
-        { label: '开始更新简历', desc: '心里已经走了', eff: { skill: 2, spirit: 1, salaryMul: 0 }, log: '你把简历改成了"结果导向型"，然后保存为 PDF。' },
+        { label: '开始更新简历', desc: '心里已经走了', eff: { skill: 2, spirit: 1 }, log: '你把简历改成了"结果导向型"，然后保存为 PDF。' },
       ],
     },
     {
@@ -265,6 +265,7 @@
     // ------------------------------------------------ 生活
     {
       id: 'ev_rent', tag: '生活', weight: 8, ageMin: 22, ageMax: 40,
+      need: function (S) { return !S.flags.house; },
       title: '房东说要涨租',
       text: '房东在微信上发来一段语音，五十秒，核心信息是"涨八百"。',
       options: [
@@ -324,7 +325,8 @@
       ],
     },
     {
-      id: 'ev_school', tag: '生活', weight: 5, ageMin: 33, ageMax: 50, need: function (S) { return S.stats.cash > 250000; },
+      id: 'ev_school', tag: '生活', weight: 5, ageMin: 33, ageMax: 50,
+      need: function (S) { return S.flags.kids > 0 && S.stats.cash > 250000; },
       title: '孩子上学',
       text: '孩子要上小学了，学区房差 40 平，私立一年 8 万，公立划片划到了隔壁区。',
       options: [
@@ -335,6 +337,10 @@
     },
     {
       id: 'ev_demolish', tag: '生活', weight: 2, once: true, ageMin: 28, ageMax: 55,
+      need: function (S) {
+        return ['rural', 'migrant', 'biz'].indexOf(S.draw.family.id) >= 0 ||
+          ['t4', 't5', 't6'].indexOf(S.draw.tier.id) >= 0;
+      },
       title: '老家的房子要拆了',
       text: '村里的通知贴出来了，你们家那栋两层小楼在红线内。你妈打电话的声音都在抖。',
       options: [
@@ -346,6 +352,7 @@
     // ------------------------------------------------ 黑天鹅
     {
       id: 'ev_layoff', tag: '黑天鹅', weight: 6, once: true, ageMin: 26, ageMax: 55,
+      need: function (S) { return !S.flags.civil; },
       title: '被优化',
       text: 'HR 约你去小会议室，桌上放着两份文件和一个纸箱。她说："公司最近在做组织调整。"',
       options: [
@@ -432,7 +439,8 @@
       ],
     },
     {
-      id: 'ev_startup', tag: '机会', weight: 4, once: true, ageMin: 27, ageMax: 45, need: function (S) { return S.stats.cash > 120000; },
+      id: 'ev_startup', tag: '机会', weight: 4, once: true, ageMin: 27, ageMax: 45,
+      need: function (S) { return S.stats.cash > 120000 && !S.flags.startup; },
       title: '有人拉你创业',
       text: '前同事说他要做一件事，"就差一个懂你这块的人"，还发了张 BP 的截图。',
       options: [

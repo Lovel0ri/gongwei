@@ -22,7 +22,7 @@
   <!-- ============================ 封面 -->
   <section id="s-landing" class="screen active">
     <div class="landing-inner">
-      <div class="kicker">人生模拟器 · 中国 · v0.4.1</div>
+      <div class="kicker">人生模拟器 · 中国 · v0.5.0</div>
       <h1 class="title">工位</h1>
       <div class="subtitle">1 in 740 Million</div>
       <p class="lede">
@@ -83,7 +83,7 @@
         <section class="card idcard">
           <div class="idcard-head"><span>身份纪录 · <span id="id-region">CN</span></span><em id="id-year">2026</em></div>
           <div class="idcard-body">
-            <div class="avatar-wrap"><canvas id="avatar" width="72" height="72"></canvas></div>
+            <div class="avatar-wrap"><canvas id="avatar" width="64" height="64"></canvas></div>
             <div class="idcard-main">
               <h2 id="id-name">—</h2>
               <dl class="idfields" id="id-fields"></dl>
@@ -205,10 +205,10 @@
 
 <!-- ============================ 结局图鉴 -->
 <div id="gallery" class="modal" hidden>
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="gal-title">
     <div class="sheet-head">
       <div class="kicker">结局图鉴 · <span id="gal-count">0 / 13</span></div>
-      <h3>你走到过的地方</h3>
+      <h3 id="gal-title">你走到过的地方</h3>
     </div>
     <div class="sheet-body">
       <div class="gal-grid" id="gal-grid"></div>
@@ -224,7 +224,7 @@
 
 <!-- ============================ 同秒的人 -->
 <div id="peer" class="modal" hidden>
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="peer-name">
     <div class="sheet-head">
       <div class="kicker">同一秒出生的人</div>
       <h3 id="peer-name">—</h3>
@@ -240,10 +240,10 @@
 
 <!-- ============================ 关于 -->
 <div id="about" class="modal" hidden>
-  <div class="sheet">
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="about-title">
     <div class="sheet-head">
       <div class="kicker">关于</div>
-      <h3>数据、边界与免责</h3>
+      <h3 id="about-title">数据、边界与免责</h3>
     </div>
     <div class="sheet-body">
       <p class="scene-text">《工位》是一个纯前端的人生模拟器，仿 1in8b.life 的结构：起点不可选，结局由真实分布推动。<br>

@@ -24,6 +24,12 @@
   }
   E.mulberry32 = mulberry32;
 
+  // 年龄是唯一的时间轴：所有跳跃都要同时改 year，否则顶栏/场景/存档会错位
+  E.setAge = function (S, age) {
+    S.age = age;
+    S.year = (D.meta.startYear || 2026) + (age - D.meta.startAge);
+  };
+
   function pickWeighted(rnd, arr) {
     let total = 0;
     for (const it of arr) total += (it.weight || 0);
@@ -39,7 +45,7 @@
     const rnd = mulberry32(seed >>> 0);
     const pick = (arr) => pickWeighted(rnd, arr);
 
-    const cityTier = pick(D.cityTiers[region]);
+    const cityTier = Object.assign({}, pick(D.cityTiers[region]));
     const family = pick(D.families[region]);
     const aptitude = pick(D.aptitudes[region] || D.aptitudes.CN);
     const major = pick(D.majors[region]);
@@ -131,8 +137,10 @@
     const cost = S.draw.tier.cost;
     const living = Math.max(2300 * cost * infl * 12, S.stats.salary * 0.30 * 12);
     let housing = 0;
-    if (S.flags.house) housing = (S.mortgageMonthly || 0) * 12;
-    else housing = S.draw.tier.rent * infl * 12 * (S.flags.partner ? 1.4 : (S.age < 30 ? 0.62 : 1));
+    if (S.flags.house) {
+      housing = (S.mortgageMonthly || 0) * 12 +
+        (S.flags.housePaid ? (S.housePrice || 0) * 0.002 : 0);
+    } else housing = S.draw.tier.rent * infl * 12 * (S.flags.partner ? 1.4 : (S.age < 30 ? 0.62 : 1));
     const kid = S.flags.kids * Math.min(3000 * cost * infl, Math.max(900, S.stats.salary * 0.32)) * 12;
     const parents = (S.age >= 45 || S.flags.parentsLive) ? 1200 * infl * 12 : 0;
     S.fin = { living: round(living), housing: round(housing), kid: round(kid), parents: round(parents) };
@@ -224,6 +232,7 @@
       S.austerity = true;
     } else { S.austerity = false; }
     const inc = annualIncome(S, side);
+    if (S.flags.twoHouses) inc.side += 1200 * 12 * Math.pow(1 + D.meta.inflation, S.age - D.meta.startAge);
     // 量入为出：没有房贷时，吃住行学不会超过到手收入的 78%。
     // 真实的人会搬到更远、吃得更省，而不是每个月凭空多欠一万。
     const essentials = cost.living + cost.housing + cost.kid + cost.parents;
@@ -245,6 +254,21 @@
     const netCash = inc.net + inc.side - (cost.living + cost.housing + cost.kid + cost.parents + misc);
     st.cash += netCash;
     if (st.cash < 0) { st.cash *= 1.04; }
+
+    // 按揭：月供里有一部分是本金，逐年摊还；还清后不再扣月供
+    if (S.flags.house && (S.mortgageLoan || 0) > 0) {
+      const interest = S.mortgageLoan * 0.049;
+      let principal = Math.max(0, (S.mortgageMonthly || 0) * 12 - interest);
+      principal = Math.min(principal, S.mortgageLoan);
+      S.mortgageLoan -= principal;
+      st.debt = Math.max(0, st.debt - principal);
+      if (S.mortgageLoan <= 1) {
+        S.mortgageLoan = 0;
+        S.mortgageMonthly = 0;
+        S.flags.housePaid = true;
+        out.lines.push({ age, kind: 'good', text: '房贷还完了。你在银行 App 上反复确认了三遍，然后什么也没说。' });
+      }
+    }
 
     // 撑不住了：卖房
     if (st.cash < -180000 && S.flags.house) {
@@ -306,11 +330,14 @@
 
     // ---- 硬性终止
     if (st.health <= 0) { out.lines.push({ age, kind: 'bad', text: '你在工位上晕倒了。再醒来时，医生说的是"以后不能这样了"。' }); S.over = true; S.ending = E.evaluate(S, 'sick'); }
-    else if (st.cash < -600000) { out.lines.push({ age, kind: 'bad', text: '银行打来第三个电话。你没有接。' }); S.over = true; S.ending = E.evaluate(S, 'debt'); }
+    else if (st.cash < -600000) {
+      out.lines.push({ age, kind: 'bad', text: '银行打来第三个电话。你没有接。' });
+      S.over = true;
+      S.ending = E.evaluate(S, S.flags.house ? 'debt' : 'debt2');
+    }
     else if (st.spirit <= 0) { out.lines.push({ age, kind: 'bad', text: '你在某个周一早上没有起床，也没有请假。' }); S.over = true; S.ending = E.evaluate(S, 'burnout'); }
 
-    S.age++;
-    S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
+    E.setAge(S, S.age + 1);
     return out;
   };
 
@@ -352,10 +379,9 @@
     base = clamp(base, 4, 99);
     const list = D.scores[S.region] || D.scores.CN;
     let pick = list[list.length - 1];
-    if (base >= 84) pick = list[0];
-    else if (base >= 70) pick = list[1];
-    else if (base >= 55) pick = list[2];
-    else if (base >= 36) pick = list[3];
+    for (let i = 0; i < list.length; i++) {
+      if (base >= (list[i].min || 0)) { pick = list[i]; break; }
+    }
     if (S.flags.spec && (pick.id === 'sn' || pick.id === 'sz')) pick = list[2];
     S.draw.score = pick;
     S.draw.edu = pick.edu;
@@ -423,8 +449,7 @@
     const ev = E.rollEvent(S);
     if (ev) out.event = ev;
 
-    S.age++;
-    S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
+    E.setAge(S, S.age + 1);
     return out;
   };
 
@@ -434,6 +459,7 @@
     if (S.flags.zkRepeat && !S.flags.track) return '复读';
     if (S.age < endAge) return S.flags.track === 'voc' ? '职高' : S.flags.track === 'tech' ? '中专' : S.flags.track === 'none' ? '打工' : '高中';
     if (S.age < D.meta.gradAge && S.stats.salary === 0 && !S.flags.vocWork) {
+      if (S.draw.edu === '专科') return '大专';
       if (S.flags.track === 'voc' || S.flags.track === 'tech' || S.flags.track === 'none') return '打工';
       return '大学';
     }
@@ -488,6 +514,7 @@
     let m = null;
     if (group === 'hot') m = byId('cs') && (S.rnd() < 0.6 ? byId('cs') : byId('fin'));
     else if (group === 'safe') m = S.rnd() < 0.45 ? byId('edu') : S.rnd() < 0.6 ? byId('med') : byId('eng');
+    else if (group === 'art') m = byId('art');
     else m = list[Math.floor(S.rnd() * list.length)];
     S.draw.major = m || list[0];
     S.draw.majorGroup = group;
@@ -514,12 +541,30 @@
   E.startWork = function (S) {
     const st = S.stats;
     const s0 = E.salary0(S);
-    if (!st.salary || st.salary < s0) st.salary = s0;
+    if (!st.salary) st.salary = s0;
     st.hours = S.draw.industry.hours;
     S.draw.salary0 = st.salary;
     E.revealIndustry(S);
     return st.salary;
   };
+
+  // 普通选项效果（special 选项也要先结这一层）
+  function applyPlain(S, eff) {
+    if (!eff) return;
+    const st = S.stats;
+    if (eff.cash) st.cash += eff.cash;
+    if (eff.salaryMul) st.salary *= eff.salaryMul;
+    if (eff.health) st.health = clamp(st.health + eff.health, 0, 100);
+    if (eff.spirit) st.spirit = clamp(st.spirit + eff.spirit, 0, 100);
+    if (eff.skill) st.skill = clamp(st.skill + eff.skill, 0, 100);
+    if (eff.acad) st.academic = clamp(st.academic + eff.acad, 0, 100);
+    if (eff.relation) st.relation = clamp(st.relation + eff.relation, 0, 100);
+    if (eff.industry) {
+      const ind = (D.industries[S.region] || []).find(x => x.id === eff.industry);
+      if (ind) S.draw.industry = ind;
+    }
+    if (eff.flags) Object.assign(S.flags, eff.flags);
+  }
 
   // ------------------------------------------------------------------ 节点选项
   E.applyNodeOption = function (S, nodeId, optIndex) {
@@ -534,6 +579,10 @@
 
     // 兼容两种写法：special 写在选项上，或写在 eff 里（旧数据是后者）
     const sp = o.special || (eff && eff.special) || null;
+    // 22 岁第一份工作：先把起薪落地，选项上的 salaryMul 才有地方乘
+    if (nodeId === 'n22' && !st.salary) E.startWork(S);
+    // special 分支会提前 return，先把普通代价结了，UI 上的"明码标价"才是真的
+    if (sp) applyPlain(S, eff);
     if (sp) {
       if (sp === 'exam' || sp === 'exam35') {
         const base = sp === 'exam35' ? 0.10 : 0.10;
@@ -547,7 +596,7 @@
           st.health = clamp(st.health + 4, 0, 100);
           lines.push({ age: S.age, kind: 'good', text: '上岸了。你把消息发到家庭群，三分钟内有 11 条回复。' });
         } else {
-          st.spirit -= 6;
+          st.spirit = clamp(st.spirit - 6, 0, 100);
           st.cash -= 6000;
           S.flags.examFailed = true;
           res.reopen = true;
@@ -561,7 +610,8 @@
         S.draw.edu = '硕士';
         st.skill = clamp(st.skill + 9, 0, 100);
         st.cash -= 30000;
-        S.age = 24;
+        st.salary = 0;
+        E.setAge(S, 24);
         res.jump = 2;
         res.redo = 'n22';
         lines.push({ age: 22, kind: 'life', text: '你考上了研究生。宿舍还是六人间，但你已经有白头发了。' });
@@ -578,21 +628,26 @@
         } else {
           unitPrice *= 0.62;
           st.salary *= 0.8;
-          S.draw.tier = (D.cityTiers[S.region] || []).find(t => t.id === 't3') || tier;
+          const t3 = (D.cityTiers[S.region] || []).find(t => t.id === 't3');
+          S.draw.tier = t3 ? Object.assign({}, t3) : tier;
           S.draw.tier.salaryMul = 0.45 + 0.55 * S.draw.tier.cost;
           S.draw.cityName = '省会';
           price = Math.min(unitPrice * 95, st.salary * 12 * 8);
         }
         const down = Math.round(price * 0.3);
         const help = Math.round((S.draw.family.help || 0) * 320000);
-        const gap = Math.max(0, down - st.cash - help);
-        st.cash -= Math.min(down, st.cash + help);
+        const cashAvail = Math.max(0, st.cash);
+        const fromParents = Math.min(help, Math.max(0, down - cashAvail));
+        const fromCash = Math.min(Math.max(0, down - fromParents), cashAvail);
+        st.cash -= fromCash;
+        const gap = Math.max(0, down - fromCash - fromParents);
         if (gap > 0) { st.debt += gap; st.spirit -= 2; }
         const loan = price - down;
         const r = 0.049 / 12, n = 360;
         const monthly = Math.round(loan * r / (1 - Math.pow(1 + r, -n)));
         st.debt += loan;
-        if (help > 0) lines.push({ age: S.age, kind: 'life', text: '首付里有 ¥' + (help / 10000).toFixed(0) + ' 万是父母出的。你妈说"别告诉你舅"。' });
+        S.mortgageLoan = loan;
+        if (fromParents > 0) lines.push({ age: S.age, kind: 'life', text: '首付里有 ¥' + (fromParents / 10000).toFixed(0) + ' 万是父母出的。你妈说"别告诉你舅"。' });
         S.flags.house = true;
         S.housePrice = price;
         S.mortgageMonthly = monthly;
@@ -637,7 +692,7 @@
         st.spirit = clamp(st.spirit - 6, 0, 100);
         st.health = clamp(st.health - 2, 0, 100);
         st.academic = clamp(st.academic + 5 + S.rnd() * 2, 0, 100);
-        S.age += 1;
+        E.setAge(S, S.age + 1);
         S.flags.zkRepeat = true;
         S.flags.schoolName = '中考复读班';
         S.flags.schoolEndAge = (D.meta.schoolEnd || 18) + 1;
@@ -654,7 +709,7 @@
         st.spirit = clamp(st.spirit - 8, 0, 100);
         st.health = clamp(st.health - 3, 0, 100);
         st.academic = clamp(st.academic + 7, 0, 100);
-        S.age += 1;
+        E.setAge(S, S.age + 1);
         S.flags.repeatedGk = true;
         S.draw.gaokaoDone = false;
         S.draw.score = null;
@@ -707,16 +762,8 @@
       }
     }
 
-    // 普通效果
-    if (eff.cash) st.cash += eff.cash;
-    if (eff.salaryMul) st.salary *= eff.salaryMul;
-    if (eff.health) st.health = clamp(st.health + eff.health, 0, 100);
-    if (eff.spirit) st.spirit = clamp(st.spirit + eff.spirit, 0, 100);
-    if (eff.skill) st.skill = clamp(st.skill + eff.skill, 0, 100);
-    if (eff.relation) st.relation = clamp(st.relation + eff.relation, 0, 100);
-    if (eff.industry) { const ind = (D.industries[S.region] || []).find(i => i.id === eff.industry); if (ind) S.draw.industry = ind; }
-    if (eff.flags) Object.assign(S.flags, eff.flags);
-    if (eff.acad) st.academic = clamp(st.academic + eff.acad, 0, 100);
+    // 普通效果（special 已在上方结过）
+    if (!sp) applyPlain(S, eff);
     if (eff.spec) S.flags.spec = true;
     if (eff.track) {
       S.flags.track = eff.track;
@@ -738,7 +785,7 @@
     }
     if (o.jump) res.jump = o.jump;
     if (nodeId === 'n18' && o.id === 'any' && S.draw.score.id === 'sn') { S.draw.edu = '专科'; }
-    if (nodeId === 'n18v') res.jump = (o.id === 'up' ? 3 : 4);
+    if (nodeId === 'n18v') res.jump = (o.id === 'up' ? 3 : 0);
     if (eff.majorGroup) { const m = E.applyMajorGroup(S, eff.majorGroup); lines.push({ age: S.age, kind: 'life', text: '你被' + m.name + '专业录取。' + m.note + '。' }); }
     // 家长可能把志愿改掉：概率看家庭，改的方向看家长的偏好
     if (nodeId === 'n18' && eff.majorGroup && !S.flags.overrideDone && !S.flags.parentOverride) {
@@ -755,7 +802,14 @@
         }
       }
     }
-    if (eff.earlyWork) { st.salary = Math.round(3200 * S.draw.tier.salaryMul); S.draw.edu = '高中'; res.jump = 4; res.skipTo22 = true; S.done['n19'] = true; S.done['n22'] = true; }
+    if (eff.earlyWork) {
+      st.salary = Math.round(3200 * S.draw.tier.salaryMul);
+      S.draw.edu = '高中';
+      S.done['n19'] = true;
+      S.done['n22'] = true;
+      st.hours = S.draw.industry.hours;
+      E.revealIndustry(S);
+    }
     if (eff.pivot) { st.spirit += 3; S.flags.pivotCount = (S.flags.pivotCount || 0) + 1; }
 
     S.done[nodeId] = true;
@@ -802,7 +856,7 @@
       spirit: Math.round(st.spirit),
       skill: Math.round(st.skill),
       relation: Math.round(st.relation),
-      years: S.history.length,
+      years: Math.max(0, S.age - D.meta.startAge),
       promotions: S.flags.promotions,
       layoffs: S.flags.laidOff,
       kids: S.flags.kids,
@@ -814,7 +868,12 @@
   };
 
   E.netWorth = function (S) {
-    return Math.round(S.stats.cash + (S.flags.house ? (S.housePrice || 0) * 0.92 : 0) - S.stats.debt);
+    return Math.round(
+      S.stats.cash +
+      (S.flags.house ? (S.housePrice || 0) * 0.92 : 0) +
+      (S.flags.twoHouses ? 300000 : 0) -
+      S.stats.debt
+    );
   };
   E.annualIncome = function (S) {
     return Math.round(S.stats.salary * 12 * 1.2);

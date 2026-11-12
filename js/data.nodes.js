@@ -61,7 +61,8 @@
         const sc = S.stats.academic;
         const score = Math.round(Math.max(210, Math.min(745, 300 + sc * 4.6)));
         const tone = sc >= 62 ? '分数够上县一中，班主任在办公室门口拍了下你的肩。'
-          : sc >= 44 ? '分数不上不下。老师说"你这个分，能上普高，也可以考虑职高"。'
+          : sc >= 44 ? '够上重点高中。老师说"这个分，去一中没问题"。'
+          : sc >= 36 ? '分数不上不下：普高稳，重点要交择校费。'
           : sc >= 28 ? '刚够普高线。你妈说"好歹是个高中"，语气像在说服自己。'
           : sc >= 22 ? '分数只够职高。你妈说"学门手艺也好"，说完自己先低了头。'
           : '分数出来那天，家里没有开灯。你爸抽了半包烟，说"读不读，你自己决定"。';
@@ -302,7 +303,8 @@
           eff: { salaryMul: 1.15, skill: 3, health: -3, relation: 1, flags: { bigCo: true } }, log: '你入职了一家名字很好听的公司，工牌上有一张不太像你的照片。' },
         { id: 'sme', label: '去中小企业，什么都干', hint: '三个人的活，一个人的钱', eff: { salaryMul: 0.95, skill: 6, relation: 2, health: -2, flags: { sme: true } }, log: '你在一个 18 人的公司里做设计、做运营、修打印机。老板说"年轻人多学点"。' },
         { id: 'exam', label: '考公 / 考编', hint: '上岸率是个位数', eff: { special: 'exam' }, log: '' },
-        { id: 'grad', label: '读研，再缓三年', hint: '学历通胀比工资快', show: function (S) { return S.draw.edu === '本科' && S.stats.academic >= 52; },
+        { id: 'grad', label: '读研，再缓三年', hint: '学历通胀比工资快',
+          show: function (S) { return S.draw.edu === '本科' && (S.flags.gradPlan || S.stats.academic >= 52); },
           eff: { special: 'grad' }, log: '' },
         { id: 'blue', label: '进厂 / 做服务业', hint: '不看学历，看体力', show: function (S) { return ['高中', '专科'].indexOf(S.draw.edu) >= 0; },
           eff: { salaryMul: 0.92, skill: 3, health: -4, spirit: -2, flags: { blue: true } }, log: '你进了一家电子厂，或者一家连锁店。培训两天，第三天就上岗。' },

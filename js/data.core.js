@@ -11,7 +11,7 @@
   D.meta = {
     title: '工位',
     subtitle: '1 in 740 Million',
-    version: '0.4.1',
+    version: '0.5.0',
     region: 'CN',
     currency: 'CNY',
     symbol: '¥',
@@ -73,14 +73,16 @@
     ],
   };
 
-  // ---------------------------------------------------------------- 高考分数档（抽签，不可选）
+  // ---------------------------------------------------------------- 高考分数档
+  // 不是抽签表，是「学力 → 分数档」的阈值表：min 是达到该档所需的高考基础分。
+  // 实际分布由学生阶段的选择决定（见 engine.rollGaokao）。
   D.scores = {
     CN: [
-      { id: 's985', name: '够 985', weight: 2, skill0: 14, edu: '本科', elite: true },
-      { id: 's1', name: '够一本', weight: 11, skill0: 9, edu: '本科', elite: false },
-      { id: 's2', name: '够二本', weight: 23, skill0: 5, edu: '本科', elite: false },
-      { id: 'sz', name: '够专科', weight: 28, skill0: 1, edu: '专科', elite: false },
-      { id: 'sn', name: '够不上', weight: 36, skill0: -3, edu: '高中', elite: false },
+      { id: 's985', name: '够 985', min: 84, edu: '本科' },
+      { id: 's1', name: '够一本', min: 70, edu: '本科' },
+      { id: 's2', name: '够二本', min: 55, edu: '本科' },
+      { id: 'sz', name: '够专科', min: 36, edu: '专科' },
+      { id: 'sn', name: '够不上', min: 4, edu: '高中' },
     ],
   };
 
