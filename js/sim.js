@@ -16,7 +16,7 @@
   // 某年龄应该弹出哪个节点（取最早未完成的、且 ≤ 当前年龄）
   Sim.nextNode = function (S) {
     // 18 岁那年自动出分：分数由学力 + 学校 + 家庭推出来，不是抽的
-    if (S.age >= D.meta.schoolEnd && !S.draw.gaokaoDone &&
+    if (S.age >= (S.flags.schoolEndAge || D.meta.schoolEnd) && !S.draw.gaokaoDone &&
       (S.flags.track === 'key' || S.flags.track === 'normal')) {
       GW.Engine.rollGaokao(S);
     }
@@ -24,6 +24,7 @@
       .sort(function (a, b) { return a.age - b.age; });
     for (const n of list) {
       if (n.when && !n.when(S)) { S.done[n.id] = true; continue; }
+      if (n.ready && !n.ready(S)) continue;   // 时机未到，不标记完成
       if (n.id === 'n19' && S.draw.edu !== '本科') { S.done[n.id] = true; continue; }
       const vis = visibleOptions(n, S);
       if (!vis.length) { S.done[n.id] = true; continue; }
@@ -110,9 +111,9 @@
         continue;
       }
       if (S.stats.salary === 0) {
-        if (S.age < D.meta.schoolEnd) {
+        if (S.age < (S.flags.schoolEndAge || D.meta.schoolEnd)) {
           if (S.flags.track === 'none') {
-            S.age = D.meta.schoolEnd;
+            S.age = S.flags.schoolEndAge || D.meta.schoolEnd;
             S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
             continue;
           }

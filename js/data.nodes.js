@@ -62,9 +62,11 @@
         const score = Math.round(Math.max(210, Math.min(745, 300 + sc * 4.6)));
         const tone = sc >= 62 ? '分数够上县一中，班主任在办公室门口拍了下你的肩。'
           : sc >= 44 ? '分数不上不下。老师说"你这个分，能上普高，也可以考虑职高"。'
-          : sc >= 30 ? '分数只够职高。你妈说"学门手艺也好"，说完自己先低了头。'
+          : sc >= 28 ? '刚够普高线。你妈说"好歹是个高中"，语气像在说服自己。'
+          : sc >= 22 ? '分数只够职高。你妈说"学门手艺也好"，说完自己先低了头。'
           : '分数出来那天，家里没有开灯。你爸抽了半包烟，说"读不读，你自己决定"。';
-        return '中考 ' + score + ' 分。' + tone + '班级群里开始有人晒录取通知，没人 @ 你。';
+        return (S.flags.zkRepeat ? '第二次中考：' : '中考 ') + score + ' 分。' + tone +
+          (S.flags.zkRepeat ? '复读班的同学在群里刷"今年一定"，没人 @ 你。' : '班级群里开始有人晒录取通知，没人 @ 你。');
       },
       options: [
         {
@@ -102,6 +104,11 @@
           show: function (S) { return S.stats.academic < 26 && ['rural','migrant','biz'].indexOf(S.draw.family.id) >= 0; },
           eff: { track: 'none', cash: 6000, spirit: 2, health: -1 },
           log: '你把课本捆起来卖给了收废品的，一共 11 块 5。表哥说南方好挣钱。',
+        },
+        {
+          id: 'repeat', label: '复读一年，明年再考一次', hint: '多花一年和一笔复读费，换一次中考',
+          show: function (S) { return !S.flags.zkRepeat && S.stats.academic < 40; },
+          eff: { special: 'repeat_zk' }, log: '',
         },
       ],
     },
@@ -149,10 +156,15 @@
     {
       id: 'n18', age: 18, title: '志愿表',
       when: function (S) { return S.flags.track === 'key' || S.flags.track === 'normal'; },
+      // 中考复读过一年，高考就顺延到 19 岁
+      ready: function (S) { return S.age >= (S.flags.schoolEndAge || 18); },
       scene: function (S) {
         if (!S.draw.score) return '分数还没出来。';
         const sc = S.draw.score;
-        return '高考 ' + (S.gaokaoScore || '—') + ' 分，' + sc.name + '。' +
+        const pressure = (S.draw.family.interfere || 0) >= 0.45
+          ? '（' + (['gov', 'mid'].indexOf(S.draw.family.id) >= 0 ? '你爸妈昨晚把招生简章摊在桌上，说"我们不是逼你，就是给你个参考"。' : '你爸说"别学那些没用的，学个能吃饭的"。') + '）'
+          : '';
+        return '高考 ' + (S.gaokaoScore || '—') + ' 分，' + sc.name + '。' + pressure +
           (sc.id === 'sn' ? '班主任在办公室里叹气，说"要不复读一年"。你妈在门外站着，没进来。' :
            sc.id === 's985' ? '全省排名前千分之几。亲戚的电话开始多了起来。' :
            '不高不低，刚好卡在一个需要认真选的分数上。志愿表只有一张，填错了没有撤销键。');
@@ -186,6 +198,44 @@
           show: function (S) { return ['sz', 'sn'].indexOf(S.draw.score.id) >= 0; },
           eff: { skill: -2, cash: 20000, health: -3, spirit: -2, earlyWork: true },
           log: '你买了南下的火车票。站了 19 个小时，下车时觉得这座城市很高。',
+        },
+        {
+          id: 'repeatGk', label: '复读一年，明年再考', hint: '多花一年和 2.5 万复读费，再赌一次',
+          show: function (S) { return !S.flags.repeatedGk && ['sn', 'sz', 's2'].indexOf(S.draw.score.id) >= 0; },
+          eff: { special: 'repeat_gk' }, log: '',
+        },
+      ],
+    },
+
+    // ------------------------------------------------------------ 18（家长改志愿）
+    {
+      id: 'n18p', age: 18, title: '志愿表被人动了',
+      when: function (S) { return !!S.flags.parentOverride; },
+      scene: function (S) {
+        const pref = D.parentMajor[S.flags.parentOverride] || D.parentMajor.safe;
+        const who = S.draw.family.id === 'rural' || S.draw.family.id === 'migrant'
+          ? '你妈从外地打电话回来，说"我托人问过了，就填这个"'
+          : S.draw.family.id === 'gov'
+            ? '你爸把招生简章摊在桌上，说"体制内，稳"'
+            : S.draw.family.id === 'mid'
+              ? '你妈说"隔壁家孩子学计算机，现在一个月三万"'
+              : '你爸说"我吃过的盐比你吃过的饭多"';
+        return '你填完志愿回家，发现表已经被改过了——改成了「' + pref.name + '」。' + pref.line + '。' +
+          who + '。志愿表还能改，截止时间是明天下午五点。';
+      },
+      options: [
+        {
+          id: 'obey', label: '算了，听家里的', hint: '关系↑ 心气↓ 专业被换',
+          eff: { special: 'override_obey' }, log: '',
+        },
+        {
+          id: 'fight', label: '连夜改回来，赌他们不会发现', hint: '被发现就完了',
+          eff: { special: 'override_fight' }, log: '',
+        },
+        {
+          id: 'teacher', label: '找班主任出面说', hint: '花点钱，成功率更高',
+          show: function (S) { return S.stats.cash >= 8000; },
+          eff: { special: 'override_teacher' }, log: '',
         },
       ],
     },
@@ -250,7 +300,7 @@
           eff: { salaryMul: 1.15, skill: 3, health: -3, relation: 1, flags: { bigCo: true } }, log: '你入职了一家名字很好听的公司，工牌上有一张不太像你的照片。' },
         { id: 'sme', label: '去中小企业，什么都干', hint: '三个人的活，一个人的钱', eff: { salaryMul: 0.95, skill: 6, relation: 2, health: -2, flags: { sme: true } }, log: '你在一个 18 人的公司里做设计、做运营、修打印机。老板说"年轻人多学点"。' },
         { id: 'exam', label: '考公 / 考编', hint: '上岸率是个位数', eff: { special: 'exam' }, log: '' },
-        { id: 'grad', label: '读研，再缓三年', hint: '学历通胀比工资快', show: function (S) { return S.draw.edu === '本科'; },
+        { id: 'grad', label: '读研，再缓三年', hint: '学历通胀比工资快', show: function (S) { return S.draw.edu === '本科' && S.stats.academic >= 52; },
           eff: { special: 'grad' }, log: '' },
         { id: 'blue', label: '进厂 / 做服务业', hint: '不看学历，看体力', show: function (S) { return ['高中', '专科'].indexOf(S.draw.edu) >= 0; },
           eff: { salaryMul: 0.92, skill: 3, health: -4, spirit: -2, flags: { blue: true } }, log: '你进了一家电子厂，或者一家连锁店。培训两天，第三天就上岗。' },
@@ -356,14 +406,14 @@
       options: [
         { id: 'push', label: '再拼八年，熬到退休', hint: '钱重要，还是命重要', eff: { salaryMul: 1.06, health: -8, spirit: -3 }, log: '你继续加班，把药放在工位抽屉里，跟胃药放在一起。' },
         { id: 'slow', label: '主动降速，少赚点', hint: '提前把命赎回来', eff: { salaryMul: 0.86, health: 9, spirit: 5, relation: 2 }, log: '你申请调去了清闲岗，工资降了两成，血压降了二十。' },
-        { id: 'sick', label: '身体已经不允许了', hint: '病退', show: function (S) { return S.stats.health < 45; },
+        { id: 'sick', label: '身体已经不允许了', hint: '病退', show: function (S) { return S.stats.health < 32; },
           eff: { special: 'retireEarly' }, log: '' },
       ],
     },
   ];
 
   D.nodeAges = {
-    n13: 13, n15: 15, n17: 16, n18: 18, n18v: 18, n19: 19,
+    n13: 13, n15: 15, n17: 16, n18: 18, n18p: 18, n18v: 18, n19: 19,
     n22: 22, n26: 26, n29: 29, n32: 32, n35: 35, n40: 40, n45: 45, n52: 52,
   };
 })();

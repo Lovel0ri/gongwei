@@ -26,7 +26,7 @@
   }
   // 正在上学的年份（会有"今年的重心"）
   function isStudent() {
-    return !!S && S.stats.salary === 0 && S.age < META.schoolEnd && S.flags.track !== 'none';
+    return !!S && S.stats.salary === 0 && S.age < (S.flags.schoolEndAge || META.schoolEnd) && S.flags.track !== 'none';
   }
 
   // ------------------------------------------------------------------ 主题
@@ -733,7 +733,17 @@
     if (eff.edu) out.push('→ ' + eff.edu);
     if (eff.startSalary) out.push('起薪 ¥' + eff.startSalary);
     if (eff.majorGroup) out.push('专业重抽');
-    if (eff.special) out.push('要赌一次');
+    if (eff.special) {
+      const SP = {
+        exam: '上岸率 < 10%', exam35: '年龄窗口只剩两年', grad: '多读三年',
+        house_big: '首付 + 30 年房贷', house_small: '回省会，工资降',
+        kid: '钱 / 时间 / 心气一起扣', freelance: '收入从此不稳', startup: '高方差，可能归零',
+        retireEarly: '提前退场', repeat_zk: '多读一年 + 9,000', repeat_gk: '多读一年 + 2.5 万',
+        override_obey: '关系 +5 · 心气 −7', override_fight: '50% 被发现',
+        override_teacher: '花 8,000 · 成功率 72%',
+      };
+      out.push(SP[eff.special] || '要赌一次');
+    }
     if (eff.flags) {
       if (eff.flags.partner) out.push('有伴侣');
       if (eff.flags.manager) out.push('转管理');
@@ -1130,7 +1140,9 @@
     const en = S.ending || {};
     return '《工位》1 in 740 Million\n' +
       '我抽到了：' + S.draw.tier.name + ' · ' + S.draw.family.name + ' · ' + S.draw.industry.name + '\n' +
-      '学历：' + S.draw.edu + (S.gaokaoScore ? '（高考 ' + S.gaokaoScore + ' 分）' : '') + '\n' +
+      '学历：' + S.draw.edu + (S.gaokaoScore ? '（高考 ' + S.gaokaoScore + ' 分）' : '') +
+        (S.flags.zkRepeat ? ' · 中考复读一年' : '') + (S.flags.repeatedGk ? ' · 高考复读一年' : '') + '\n' +
+      (S.flags.overrideDone && S.flags.parentChangedMajor ? '志愿被家里改过\n' : '') +
       '结局：「' + en.name + '」\n' +
       '存款 ' + fmtMoney(m.cash) + '｜健康 ' + m.health + '｜心气 ' + m.spirit + '｜能力 ' + m.skill + '\n' +
       '晋升 ' + m.promotions + ' 次，被裁 ' + m.layoffs + ' 次。';

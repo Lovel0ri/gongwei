@@ -317,13 +317,16 @@
   // ------------------------------------------------------------------ 学历 / 阶段文字
   E.eduText = function (S) {
     const t = S.flags.track;
+    const endAge = S.flags.schoolEndAge || D.meta.schoolEnd || 18;
     if (S.age < 15) return '初中';
-    if (S.age < 18) {
+    if (S.flags.zkRepeat && !t) return '复读';
+    if (S.age < endAge) {
       if (t === 'voc') return '职高';
       if (t === 'tech') return '中专';
       if (t === 'none') return '辍学';
       return '高中';
     }
+    if (!S.draw.gaokaoDone && (t === 'key' || t === 'normal')) return '高中（复读）';
     if (S.flags.vocWork) return S.draw.edu + ' · 已工作';
     if (S.stats.salary === 0 && S.age < D.meta.gradAge) {
       return S.draw.edu === '本科' ? '大学在读' : (S.draw.edu === '专科' ? '大专在读' : S.draw.edu);
@@ -342,6 +345,9 @@
     if (S.flags.stream === 'sci') base += 2;
     if (S.flags.stream === 'art') base -= 1;
     if (S.flags.spec) base += 7;
+    S.flags.gaokaoAttempt = (S.flags.gaokaoAttempt || 0) + 1;
+    // 复读不是保底：有人涨 50 分，也有人第二年更慌
+    if (S.flags.repeatedGk && S.flags.gaokaoAttempt >= 2) base += (S.rnd() < 0.22 ? -7 : 5);
     base += (S.rnd() - 0.5) * 12;
     base = clamp(base, 4, 99);
     const list = D.scores[S.region] || D.scores.CN;
@@ -423,8 +429,10 @@
   };
 
   E.statusOf = function (S) {
+    const endAge = S.flags.schoolEndAge || D.meta.schoolEnd || 18;
     if (S.age < 15) return '初中';
-    if (S.age < 18) return S.flags.track === 'voc' ? '职高' : S.flags.track === 'tech' ? '中专' : S.flags.track === 'none' ? '打工' : '高中';
+    if (S.flags.zkRepeat && !S.flags.track) return '复读';
+    if (S.age < endAge) return S.flags.track === 'voc' ? '职高' : S.flags.track === 'tech' ? '中专' : S.flags.track === 'none' ? '打工' : '高中';
     if (S.age < D.meta.gradAge && S.stats.salary === 0 && !S.flags.vocWork) {
       if (S.flags.track === 'voc' || S.flags.track === 'tech' || S.flags.track === 'none') return '打工';
       return '大学';
@@ -482,6 +490,7 @@
     else if (group === 'safe') m = S.rnd() < 0.45 ? byId('edu') : S.rnd() < 0.6 ? byId('med') : byId('eng');
     else m = list[Math.floor(S.rnd() * list.length)];
     S.draw.major = m || list[0];
+    S.draw.majorGroup = group;
     S.stats.skill = clamp(S.stats.skill + (1 - S.draw.major.match) * -2, 0, 100);
     return S.draw.major;
   };
@@ -513,8 +522,9 @@
     const lines = [];
     const res = { lines, jump: 0, redo: null, finish: null };
 
-    if (o.special) {
-      const sp = o.special;
+    // 兼容两种写法：special 写在选项上，或写在 eff 里（旧数据是后者）
+    const sp = o.special || (eff && eff.special) || null;
+    if (sp) {
       if (sp === 'exam' || sp === 'exam35') {
         const base = sp === 'exam35' ? 0.10 : 0.10;
         const p = clamp(base + st.relation / 900 + st.skill / 900 + (S.draw.family.id === 'gov' ? 0.05 : 0) - (S.age - 22) * 0.006, 0.03, 0.42);
@@ -610,6 +620,81 @@
         S.done[nodeId] = true;
         return res;
       }
+      // ---- 复读：中考
+      if (sp === 'repeat_zk') {
+        const fee = 9000;
+        st.cash -= fee;
+        st.spirit = clamp(st.spirit - 6, 0, 100);
+        st.health = clamp(st.health - 2, 0, 100);
+        st.academic = clamp(st.academic + 5 + S.rnd() * 2, 0, 100);
+        S.age += 1;
+        S.flags.zkRepeat = true;
+        S.flags.schoolName = '中考复读班';
+        S.flags.schoolEndAge = (D.meta.schoolEnd || 18) + 1;
+        S.done[nodeId] = false;
+        res.redo = nodeId;
+        lines.push({ age: S.age, kind: 'life', text: '你去了县城的复读学校，一年 ' + (fee / 10000).toFixed(1) + ' 万。教室在四楼，墙上贴着上一届的分数。' });
+        lines.push({ age: S.age, kind: 'life', text: '一年后，你又坐进了中考考场。这次你妈没在门口站着。' });
+        return res;
+      }
+      // ---- 复读：高考
+      if (sp === 'repeat_gk') {
+        const fee = 25000;
+        st.cash -= fee;
+        st.spirit = clamp(st.spirit - 8, 0, 100);
+        st.health = clamp(st.health - 3, 0, 100);
+        st.academic = clamp(st.academic + 7, 0, 100);
+        S.age += 1;
+        S.flags.repeatedGk = true;
+        S.draw.gaokaoDone = false;
+        S.draw.score = null;
+        S.gaokaoScore = 0;
+        S.done[nodeId] = false;
+        res.redo = nodeId;
+        lines.push({ age: S.age, kind: 'life', text: '你交了 2.5 万复读费，回到一个和高中差不多的地方，只是同学都不认识。' });
+        lines.push({ age: S.age, kind: 'life', text: '这一年你瘦了 8 斤。第二次进考场，你在草稿纸上写了"最后一次"。' });
+        return res;
+      }
+      // ---- 志愿被家长改掉
+      if (sp === 'override_obey' || sp === 'override_fight' || sp === 'override_teacher') {
+        const pref = S.flags.parentOverride || 'safe';
+        const jump = (S.draw.edu === '本科' ? 1 : 4);
+        const applyParent = function () {
+          const m = E.applyMajorGroup(S, pref);
+          S.flags.parentChangedMajor = true;
+          lines.push({ age: S.age, kind: 'life', text: '专业定成了' + m.name + '。' + m.note + '。' });
+        };
+        if (sp === 'override_obey') {
+          applyParent();
+          st.relation = clamp(st.relation + 5, 0, 100);
+          st.spirit = clamp(st.spirit - 7, 0, 100);
+          lines.push({ age: S.age, kind: 'event', text: '你把表交了上去，一个字没改。你爸那天晚饭多喝了一杯，说"懂事"。' });
+        } else {
+          const cost = sp === 'override_teacher' ? 8000 : 0;
+          st.cash -= cost;
+          const p = sp === 'override_teacher' ? 0.72 : 0.5;
+          if (S.rnd() < p) {
+            st.spirit = clamp(st.spirit + 8, 0, 100);
+            st.relation = clamp(st.relation - (cost ? 4 : 9), 0, 100);
+            lines.push({
+              age: S.age, kind: 'good',
+              text: cost
+                ? '班主任给你爸打了四十分钟电话，最后说通了。你把志愿改回了自己填的那个。'
+                : '你在截止前十分钟改了回去。你爸到现在都不知道。',
+            });
+          } else {
+            applyParent();
+            st.relation = clamp(st.relation - 12, 0, 100);
+            st.spirit = clamp(st.spirit - 4, 0, 100);
+            lines.push({ age: S.age, kind: 'bad', text: '你改的时候被你妈看见了。她把手机摔在桌上，说"你翅膀硬了"。志愿最后还是按他们的填了。' });
+          }
+        }
+        S.flags.parentOverride = null;
+        S.flags.overrideDone = true;
+        S.done[nodeId] = true;
+        res.jump = jump;
+        return res;
+      }
     }
 
     // 普通效果
@@ -644,6 +729,21 @@
     if (nodeId === 'n18' && o.id === 'any' && S.draw.score.id === 'sn') { S.draw.edu = '专科'; }
     if (nodeId === 'n18v') res.jump = (o.id === 'up' ? 3 : 4);
     if (eff.majorGroup) { const m = E.applyMajorGroup(S, eff.majorGroup); lines.push({ age: S.age, kind: 'life', text: '你被' + m.name + '专业录取。' + m.note + '。' }); }
+    // 家长可能把志愿改掉：概率看家庭，改的方向看家长的偏好
+    if (nodeId === 'n18' && eff.majorGroup && !S.flags.overrideDone && !S.flags.parentOverride) {
+      const fam = S.draw.family;
+      const pref = fam.pref || 'safe';
+      if (S.draw.majorGroup !== pref) {
+        const p = clamp((fam.interfere || 0.3) + (st.relation > 60 ? 0.06 : 0) - (st.spirit > 70 ? 0.05 : 0), 0.05, 0.7);
+        if (S.rnd() < p) {
+          S.flags.parentOverride = pref;
+          S.flags.playerGroup = S.draw.majorGroup;
+          S.flags.overrideDone = false;
+          S.done['n18p'] = false;
+          res.redo = 'n18p';
+        }
+      }
+    }
     if (eff.earlyWork) { st.salary = Math.round(3200 * S.draw.tier.salaryMul); S.draw.edu = '高中'; res.jump = 4; res.skipTo22 = true; S.done['n19'] = true; S.done['n22'] = true; }
     if (eff.pivot) { st.spirit += 3; S.flags.pivotCount = (S.flags.pivotCount || 0) + 1; }
 

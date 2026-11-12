@@ -11,7 +11,7 @@
   D.meta = {
     title: '工位',
     subtitle: '1 in 740 Million',
-    version: '0.3.0',
+    version: '0.4.0',
     region: 'CN',
     currency: 'CNY',
     symbol: '¥',
@@ -53,12 +53,12 @@
   // ---------------------------------------------------------------- 家庭
   D.families = {
     CN: [
-      { id: 'gov', name: '体制内双职工', weight: 11, cash0: 260000, relation0: 12, spirit0: 4, ceiling: '一本', help: 0.9, note: '家里最早的教学理念：稳定压倒一切' },
-      { id: 'mid', name: '城市中产', weight: 15, cash0: 180000, relation0: 6, spirit0: 2, ceiling: '一本', help: 0.7, note: '父母有一套房，也有一份不甘心' },
-      { id: 'worker', name: '城市双职工', weight: 20, cash0: 60000, relation0: 0, spirit0: 0, ceiling: '二本', help: 0.35, note: '不富，但每个月都有工资进账' },
-      { id: 'biz', name: '个体户', weight: 12, cash0: 90000, relation0: 3, spirit0: -1, ceiling: '二本', help: 0.4, note: '起早贪黑，账本比你的作业本厚' },
-      { id: 'migrant', name: '进城务工', weight: 21, cash0: 20000, relation0: -4, spirit0: -2, ceiling: '专科', help: 0.08, note: '一年见两次，一次过年，一次吵架' },
-      { id: 'rural', name: '农村留守', weight: 21, cash0: 8000, relation0: -6, spirit0: -3, ceiling: '专科', help: 0.02, note: '爷爷奶奶带大的，父母在很远的地方' },
+      { id: 'gov', name: '体制内双职工', weight: 11, cash0: 260000, relation0: 12, spirit0: 4, ceiling: '一本', help: 0.9, interfere: 0.56, pref: 'safe', note: '家里最早的教学理念：稳定压倒一切' },
+      { id: 'mid', name: '城市中产', weight: 15, cash0: 180000, relation0: 6, spirit0: 2, ceiling: '一本', help: 0.7, interfere: 0.50, pref: 'hot', note: '父母有一套房，也有一份不甘心' },
+      { id: 'worker', name: '城市双职工', weight: 20, cash0: 60000, relation0: 0, spirit0: 0, ceiling: '二本', help: 0.35, interfere: 0.42, pref: 'safe', note: '不富，但每个月都有工资进账' },
+      { id: 'biz', name: '个体户', weight: 12, cash0: 90000, relation0: 3, spirit0: -1, ceiling: '二本', help: 0.4, interfere: 0.44, pref: 'hot', note: '起早贪黑，账本比你的作业本厚' },
+      { id: 'migrant', name: '进城务工', weight: 21, cash0: 20000, relation0: -4, spirit0: -2, ceiling: '专科', help: 0.08, interfere: 0.26, pref: 'safe', note: '一年见两次，一次过年，一次吵架' },
+      { id: 'rural', name: '农村留守', weight: 21, cash0: 8000, relation0: -6, spirit0: -3, ceiling: '专科', help: 0.02, interfere: 0.30, pref: 'safe', note: '爷爷奶奶带大的，父母在很远的地方' },
     ],
   };
 
@@ -252,6 +252,12 @@
 
   D.relStatus = ['关系平顺', '关系亲密', '关系疏离', '关系紧张'];
 
+  // 家长会替你填成什么（志愿被改时用）
+  D.parentMajor = {
+    safe: { name: '师范 / 医学 / 机械', line: '稳定，有编制，饿不死，也说不上喜欢' },
+    hot: { name: '计算机 / 金融', line: '赚钱，体面，你爸在饭桌上能说得出口' },
+  };
+
   D.sceneDesc = {
     t1: '高楼之间，地铁口的风',
     t2: '新区，写字楼和工地挨着',
@@ -312,6 +318,13 @@
       '晚自习停电，全班欢呼了三秒，然后老师拿出了手电筒。',
       '你在作文里写"我的理想"，编了一个自己都不信的回答。',
       '中考倒计时牌翻到了 100 天，你突然有点慌。',
+    ],
+    repeat: [
+      '复读班的黑板上写着"距离高考还有 300 天"，字是上一届写的，一直没擦。',
+      '你妈把这一年的补课费说成"投资"，说的时候没看你。',
+      '你在复读学校的走廊上遇到了初中同桌，他去年也差 11 分。',
+      '第二次进考场，你发现监考老师还是去年那个，他好像认出了你。',
+      '你在复读班的排名从第 40 名到了第 12 名，老师说"早这样多好"。',
     ],
     promotion: ['你升了一级，工资涨了，会也多了。', '你被任命为小组负责人，从此要为别人的错误写检讨。', '你的名字出现在了新的组织架构图里，比上次大了一点。'],
     layoff: ['HR 约你"聊一聊"，会议室里有两杯水，只有一杯是给你的。', '你被"优化"了，补偿是 N+1，态度是 N-1。', '你的工位在一个周五下午被清空，绿植归了邻座。'],
