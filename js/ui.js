@@ -639,7 +639,7 @@
       }
       afterStep();
       if (wantRun && !busy && !S.over) play(false);
-    }, 3.2);
+    }, 1.5);
   }
 
   function openEvent(ev, done) {
@@ -665,7 +665,7 @@
           closeModal();
           if (done) done();
           if (wantRun && !busy && !S.over) play(false);
-        }, 2.2);
+        }, 1.5);
       };
       box.appendChild(b);
     });
@@ -689,7 +689,7 @@
     const btn = $('#m-next');
     btn.hidden = false;
     let advanced = false;
-    let countdown = (typeof secs === 'number' ? secs : 2.4);
+    let countdown = (typeof secs === 'number' ? secs : 1.5);
     let tick = null;
     const total = countdown;
 
@@ -724,7 +724,7 @@
       sheet.onmouseenter = halt;
       sheet.onmouseleave = function () { if (!advanced) start(); };
     }
-    if (autoDecide) setTimeout(go, 700);
+    if (autoDecide) setTimeout(go, 600);
   }
 
   function closeModal() { $('#modal').hidden = true; busy = false; }
