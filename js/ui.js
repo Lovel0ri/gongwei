@@ -15,6 +15,21 @@
   let busy = false;
   let resumeAfter = false;
 
+  // ------------------------------------------------------------------ 主题
+  const THEME_KEY = 'gongwei.theme';
+  function currentTheme() { return document.documentElement.getAttribute('data-theme') || 'dark'; }
+  function applyTheme(t) {
+    document.documentElement.setAttribute('data-theme', t);
+    try { localStorage.setItem(THEME_KEY, t); } catch (e) {}
+    const icon = t === 'light' ? '☀' : '☾';
+    const label = t === 'light' ? '☀ 亮色' : '☾ 暗色';
+    const top = $('#btn-theme');
+    if (top) { top.textContent = icon; top.title = t === 'light' ? '切换到暗色' : '切换到亮色'; }
+    const flo = $('#btn-theme-float');
+    if (flo) { flo.textContent = label; flo.title = t === 'light' ? '切换到暗色' : '切换到亮色'; }
+  }
+  function toggleTheme() { applyTheme(currentTheme() === 'light' ? 'dark' : 'light'); }
+
   // ------------------------------------------------------------------ utils
   function fmtWan(n) {
     if (!n) return '0';
@@ -32,6 +47,7 @@
   }
   function show(id) {
     $$('.screen').forEach(function (el) { el.classList.toggle('active', el.id === id); });
+    document.body.classList.toggle('playing', id === 's-play');
     window.scrollTo(0, 0);
   }
 
@@ -251,10 +267,10 @@
       bar('健康', st.health, 'var(--green)') +
       bar('心气', st.spirit, 'var(--amber)') +
       bar('能力', st.skill, 'var(--blue)') +
-      bar('关系', st.relation, '#b06d8a') +
-      bar('现金', st.cash <= 0 ? 0 : cashPct, '#c7c1b4', cashPct, fmtMoney(st.cash))
+      bar('关系', st.relation, 'var(--rel)') +
+      bar('现金', st.cash <= 0 ? 0 : cashPct, 'var(--cash)', cashPct, fmtMoney(st.cash))
         .replace('class="bar-row', 'class="bar-row') +
-      bar('自由', st.freedom, '#8a8a76', clamp(st.freedom / 75 * 100, 0, 100), Math.round(st.freedom) + 'h');
+      bar('自由', st.freedom, 'var(--free)', clamp(st.freedom / 75 * 100, 0, 100), Math.round(st.freedom) + 'h');
   }
 
   function renderFinance() {
@@ -343,8 +359,7 @@
       const h = S.history.find(function (x) { return x.age === a; });
       el.className = 'lm' + (a === S.age ? ' now' : '');
       if (!h) { el.classList.add('future'); el.style.background = ''; return; }
-      el.style.background = h.health > 70 ? '#6f9a6a' : h.health > 50 ? '#a3a45f' : h.health > 30 ? '#c08a4e' : '#b8544a';
-      if (h.health <= 0) el.style.background = '#3a1a1a';
+      el.style.background = h.health > 70 ? 'var(--green)' : h.health > 50 ? '#a3a45f' : h.health > 30 ? '#c08a4e' : 'var(--red)';
     });
   }
 
@@ -357,12 +372,26 @@
       (S.identity.parents[1].age + S.age - 18) + ' 岁</em>';
   }
 
+  // ------------------------------------------------------------------ 主题色
+  function themeColors() {
+    const cs = getComputedStyle(document.documentElement);
+    const g = function (n) { return cs.getPropertyValue(n).trim() || '#888'; };
+    return {
+      text: g('--text'), text2: g('--text-2'), text3: g('--text-3'),
+      line: g('--line'), lineSoft: g('--line-soft'),
+      surface: g('--surface'), surface2: g('--surface-2'),
+      accent: g('--accent'), green: g('--green'), blue: g('--blue'),
+      light: currentTheme() === 'light',
+    };
+  }
+
   // ------------------------------------------------------------------ 像素画
   function drawAvatar(cv, id) {
     const ctx = cv.getContext('2d');
     const W = 64, H = 64, P = 4;
     ctx.imageSmoothingEnabled = false;
-    ctx.fillStyle = '#17171c'; ctx.fillRect(0, 0, W, H);
+    const T = themeColors();
+    ctx.fillStyle = T.surface2; ctx.fillRect(0, 0, W, H);
     const h = hash(id.name + id.gender);
     const skin = ['#e8c39e', '#d9ab84', '#c08e63', '#f0d0ae'][h % 4];
     const hair = ['#1c1a19', '#3a2a20', '#5a3a2a'][(h >> 3) % 3];
@@ -378,7 +407,7 @@
     px(7, 9, '#c99'); px(8, 9, '#c99');
     for (let y = 12; y < 16; y++) for (let x = 4; x < 12; x++) px(x, y, shirt);
     px(7, 12, skin); px(8, 12, skin);
-    ctx.strokeStyle = '#2b2b33'; ctx.lineWidth = 1;
+    ctx.strokeStyle = T.line; ctx.lineWidth = 1;
     ctx.strokeRect(.5, .5, W - 1, H - 1);
   }
 
@@ -388,7 +417,9 @@
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, W, H);
     const h = hash(String(S.seed) + S.draw.tier.id);
-    const night = (S.year % 4) === 3, dusk = (S.year % 4) === 2;
+    const T = themeColors();
+    // 亮色主题里不出现夜景，避免页面中间出现一块黑
+    const night = !T.light && (S.year % 4) === 3, dusk = (S.year % 4) === 2;
 
     // 天空
     const skyTop = night ? '#101828' : dusk ? '#3a2b3c' : '#7fa8c9';
@@ -505,6 +536,10 @@
     ctx.fillStyle = shirt; ctx.fillRect(px * P, (py + 5) * P, 5 * P, 4 * P);
     ctx.fillStyle = '#22242c'; ctx.fillRect((px + 1) * P, (py + 9) * P, P, 2 * P);
     ctx.fillRect((px + 3) * P, (py + 9) * P, P, 2 * P);
+
+    // 按主题轻微融合，避免画面和 UI 割裂
+    ctx.fillStyle = T.light ? 'rgba(246,243,236,.12)' : 'rgba(10,10,12,.05)';
+    ctx.fillRect(0, 0, W, H);
 
     // 草
     for (let i = 0; i < 30; i++) {
@@ -687,6 +722,7 @@
   function drawRadar(cv, vals) {
     const c = setupCanvas(cv, Math.min(300, (cv.clientWidth || 360) * 0.82));
     const ctx = c.ctx, w = c.w, h = c.h;
+    const T = themeColors();
     const cx = w / 2, cy = h / 2 + 4, R = Math.min(w, h) / 2 - 42;
     const n = vals.length;
     ctx.clearRect(0, 0, w, h);
@@ -698,14 +734,14 @@
         const x = cx + Math.cos(a) * r, y = cy + Math.sin(a) * r;
         i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
       }
-      ctx.strokeStyle = 'rgba(255,255,255,.07)'; ctx.lineWidth = 1; ctx.stroke();
+      ctx.strokeStyle = T.light ? 'rgba(0,0,0,.10)' : 'rgba(255,255,255,.09)'; ctx.lineWidth = 1; ctx.stroke();
     }
     vals.forEach(function (v, i) {
       const a = -Math.PI / 2 + i * (Math.PI * 2 / n);
       ctx.beginPath(); ctx.moveTo(cx, cy);
       ctx.lineTo(cx + Math.cos(a) * R, cy + Math.sin(a) * R);
-      ctx.strokeStyle = 'rgba(255,255,255,.09)'; ctx.stroke();
-      ctx.fillStyle = '#8b8680'; ctx.font = '11px ui-monospace, monospace';
+      ctx.strokeStyle = T.light ? 'rgba(0,0,0,.12)' : 'rgba(255,255,255,.10)'; ctx.stroke();
+      ctx.fillStyle = T.text3; ctx.font = '11px ui-monospace, monospace';
       ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
       ctx.fillText(v.label + ' ' + Math.round(v.v), cx + Math.cos(a) * (R + 20), cy + Math.sin(a) * (R + 18));
     });
@@ -717,8 +753,10 @@
       i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
     });
     ctx.closePath();
-    ctx.fillStyle = 'rgba(217,164,78,.16)'; ctx.fill();
-    ctx.strokeStyle = '#d9a44e'; ctx.lineWidth = 1.5; ctx.stroke();
+    ctx.save();
+    ctx.globalAlpha = 0.16; ctx.fillStyle = T.accent; ctx.fill();
+    ctx.restore();
+    ctx.strokeStyle = T.accent; ctx.lineWidth = 1.5; ctx.stroke();
   }
 
   function drawLifeline(cv, hist) {
@@ -726,6 +764,7 @@
     const ctx = c.ctx, w = c.w, h = c.h;
     ctx.clearRect(0, 0, w, h);
     if (!hist.length) return;
+    const T = themeColors();
     const pad = { l: 34, r: 34, t: 14, b: 22 };
     const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
     const ages = hist.map(function (x) { return x.age; });
@@ -734,8 +773,8 @@
     for (let i = 0; i <= 3; i++) {
       const y = pad.t + ih * i / 3;
       ctx.beginPath(); ctx.moveTo(pad.l, y); ctx.lineTo(w - pad.r, y);
-      ctx.strokeStyle = 'rgba(255,255,255,.06)'; ctx.stroke();
-      ctx.fillStyle = '#625e59'; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'right';
+      ctx.strokeStyle = T.light ? 'rgba(0,0,0,.10)' : 'rgba(255,255,255,.07)'; ctx.stroke();
+      ctx.fillStyle = T.text3; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'right';
       ctx.fillText(Math.round(100 * (1 - i / 3)), pad.l - 6, y + 3);
     }
     const X = function (age) { return pad.l + (age - a0) / Math.max(1, (a1 - a0)) * iw; };
@@ -748,12 +787,12 @@
       });
       ctx.strokeStyle = color; ctx.lineWidth = 1.4; ctx.stroke();
     }
-    line(function (p) { return p.salary / maxSalary * 100; }, '#d9a44e');
-    line(function (p) { return p.health; }, '#6f9a6a');
-    line(function (p) { return p.spirit; }, '#6d8fb0');
-    ctx.fillStyle = '#625e59'; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'center';
+    line(function (p) { return p.salary / maxSalary * 100; }, T.accent);
+    line(function (p) { return p.health; }, T.green);
+    line(function (p) { return p.spirit; }, T.blue);
+    ctx.fillStyle = T.text3; ctx.font = '9px ui-monospace, monospace'; ctx.textAlign = 'center';
     [a0, Math.round((a0 + a1) / 2), a1].forEach(function (a) { ctx.fillText(a + '岁', X(a), h - 6); });
-    ctx.textAlign = 'right'; ctx.fillStyle = '#8b8680';
+    ctx.textAlign = 'right'; ctx.fillStyle = T.text3;
     ctx.fillText('月薪峰值 ' + fmtMoney(maxSalary), w - pad.r, 10);
   }
 
@@ -840,6 +879,10 @@
       });
     };
     $('#btn-load').onclick = function () { if (!loadSave()) alert('存档读取失败'); };
+
+    applyTheme(currentTheme());
+    $('#btn-theme').onclick = toggleTheme;
+    if ($('#btn-theme-float')) $('#btn-theme-float').onclick = toggleTheme;
 
     $('#btn-play').onclick = function () { running ? pause() : play(); };
     $('#btn-skip').onclick = skipToNode;

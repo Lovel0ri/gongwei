@@ -6,6 +6,15 @@
 <title>工位 · 1 in 740 Million</title>
 <meta name="description" content="一个仿 1in8b.life 的中国职场模拟器。随机出生，随机入行，从 22 岁干到退休。">
 <link rel="stylesheet" href="css/style.css">
+<script>
+(function () {
+  try {
+    var t = localStorage.getItem('gongwei.theme');
+    if (!t) t = 'light';   // 首次默认亮色；切换后会记住
+    document.documentElement.setAttribute('data-theme', t);
+  } catch (e) { document.documentElement.setAttribute('data-theme', 'dark'); }
+})();
+</script>
 </head>
 <body>
 <div id="app">
@@ -13,7 +22,7 @@
   <!-- ============================ 封面 -->
   <section id="s-landing" class="screen active">
     <div class="landing-inner">
-      <div class="kicker">职场模拟器 · 中国 · v0.2</div>
+      <div class="kicker">职场模拟器 · 中国 · v0.2.1</div>
       <h1 class="title">工位</h1>
       <div class="subtitle">1 in 740 Million</div>
       <p class="lede">
@@ -60,6 +69,7 @@
         </div>
         <button id="btn-skip" class="tbtn">快进到下个抉择 »</button>
         <button id="btn-auto" class="tbtn">自动抉择</button>
+        <button id="btn-theme" class="tbtn icon" title="切换主题">☾</button>
         <button id="btn-about2" class="tbtn icon" title="关于">?</button>
       </div>
     </header>
@@ -169,6 +179,8 @@
 </div>
 
 <!-- ============================ 弹窗 -->
+<button id="btn-theme-float" class="theme-toggle theme-float" title="切换主题">☾</button>
+
 <div id="modal" class="modal" hidden>
   <div class="sheet" role="dialog" aria-modal="true">
     <div class="sheet-head">
