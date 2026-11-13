@@ -476,12 +476,17 @@
     const abs = Math.abs(v);
     return (v > 0 ? '+' : '−') + (Math.abs(abs % 1) > 0.001 ? abs.toFixed(2) : abs.toFixed(0)) + (unit || '');
   }
+  let lifeSig = '';
   function renderLife() {
     const box = $('#life-rows');
     if (!box || !S) return;
     const L = D.lifestyles;
     if (!L) return;
     if (!S.life) S.life = Object.assign({}, L.defaults);
+    // 选择没变就不重建，避免每年推进时把 DOM 和键盘焦点打断
+    const sig = L.order.map(function (dim) { return S.life[dim]; }).join('|');
+    if (sig === lifeSig && box.children.length) return;
+    lifeSig = sig;
     box.innerHTML = '';
     L.order.forEach(function (dim) {
       const d = L.dims[dim];
