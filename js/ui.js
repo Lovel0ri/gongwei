@@ -333,6 +333,7 @@
     renderFinance();
     renderScene();
     renderFocus();
+    renderLife();
     renderLog();
     renderFamily();
     renderPeers();
@@ -467,6 +468,61 @@
     });
   }
   function bindChips() { /* 事件委托已在 renderFocus 内绑定 */ }
+
+  // ------------------------------------------------------------------ 生活方式
+  function lifeSign(n, unit) {
+    const v = Math.round(n * 100) / 100;
+    if (!v) return null;
+    const abs = Math.abs(v);
+    return (v > 0 ? '+' : '−') + (Math.abs(abs % 1) > 0.001 ? abs.toFixed(2) : abs.toFixed(0)) + (unit || '');
+  }
+  function renderLife() {
+    const box = $('#life-rows');
+    if (!box || !S) return;
+    const L = D.lifestyles;
+    if (!L) return;
+    if (!S.life) S.life = Object.assign({}, L.defaults);
+    box.innerHTML = '';
+    L.order.forEach(function (dim) {
+      const d = L.dims[dim];
+      const row = document.createElement('div');
+      row.className = 'life-row';
+      const k = document.createElement('span');
+      k.className = 'life-k';
+      k.textContent = d.name;
+      const wrap = document.createElement('span');
+      wrap.className = 'life-chips';
+      d.options.forEach(function (o) {
+        const sel = S.life[dim] === o.id;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'lchip' + (sel ? ' on' : '');
+        b.textContent = o.name;
+        b.title = o.note;
+        b.setAttribute('aria-pressed', sel ? 'true' : 'false');
+        b.onclick = function () {
+          if (busy) return;
+          if (!E.setLife(S, dim, o.id)) return;
+          renderLife();
+          save();
+        };
+        wrap.appendChild(b);
+      });
+      row.appendChild(k); row.appendChild(wrap);
+      box.appendChild(row);
+    });
+    const t = E.lifeTotals(S);
+    const parts = [];
+    if (t.health) parts.push('健康 ' + lifeSign(t.health));
+    if (t.spirit) parts.push('心气 ' + lifeSign(t.spirit));
+    if (t.relation) parts.push('关系 ' + lifeSign(t.relation));
+    if (t.freedom) parts.push('自由 ' + lifeSign(t.freedom) + 'h/周');
+    if (t.misc) parts.push('杂项花销 ' + lifeSign(t.misc * 100, '%'));
+    if (t.cash) parts.push('固定花销 ' + fmtMoney(-t.cash) + '/年');
+    const who = $('#life-who'), nums = $('#life-nums');
+    if (who) who.textContent = L.order.map(function (dim) { return E.lifeOption(S, dim).name; }).join(' · ');
+    if (nums) nums.textContent = parts.length ? '每年：' + parts.join(' · ') : '每年：不增不减，随波逐流';
+  }
 
   function renderLog() {
     const box = $('#log');
@@ -871,7 +927,7 @@
       }
       afterStep();
       if (wantRun && !busy && !S.over) play(false);
-    }, 1.5);
+    });
   }
 
   function openEvent(ev, done) {
@@ -906,7 +962,7 @@
           closeModal();
           if (done) done();
           if (wantRun && !busy && !S.over) play(false);
-        }, 1.5);
+        });
       };
       box.appendChild(b);
     });
@@ -919,7 +975,7 @@
     setTimeout(function () { const b = box.querySelector('.opt'); if (b) b.focus(); }, 0);
   }
 
-  function showResult(lines, next, secs) {
+  function showResult(lines, next) {
     const box = $('#m-options'); box.hidden = true;
     const res = $('#m-result'); res.hidden = false; res.innerHTML = '';
     (lines.length ? lines : [{ text: '你没有说话。', kind: '' }]).forEach(function (l) {
@@ -930,43 +986,15 @@
     });
     const btn = $('#m-next');
     btn.hidden = false;
-    let advanced = false;
-    let countdown = (typeof secs === 'number' ? secs : 1.5);
-    let tick = null;
-    const total = countdown;
-
-    const go = function () {
-      if (advanced) return;
-      advanced = true;
-      if (tick) { clearInterval(tick); tick = null; }
+    btn.textContent = '继续';
+    btn.onclick = function () {
+      if (!btn.onclick) return;
       btn.onclick = null;
-      btn.textContent = '继续';
       next();
     };
-    const render = function () {
-      btn.textContent = '继续 · ' + Math.max(0, countdown).toFixed(1) + 's';
-    };
-    const start = function () {
-      if (advanced || tick) return;
-      tick = setInterval(function () {
-        countdown -= 0.1;
-        if (countdown <= 0) return go();
-        render();
-      }, 100);
-    };
-    const halt = function () { if (tick) { clearInterval(tick); tick = null; } };
-
-    render();
-    start();
-    btn.onclick = go;
-
-    // 鼠标停在弹窗上时暂停倒计时，方便读结果
-    const sheet = document.querySelector('.sheet');
-    if (sheet) {
-      sheet.onmouseenter = halt;
-      sheet.onmouseleave = function () { if (!advanced) start(); };
-    }
-    if (autoDecide) setTimeout(go, 600);
+    btn.focus();
+    // 只有明确打开「自动抉择」时才替玩家点继续，否则等你自己看完
+    if (autoDecide) setTimeout(function () { if (btn.onclick && !$('#modal').hidden) btn.click(); }, 700);
   }
 
   function closeModal() { $('#modal').hidden = true; busy = false; setInert(false); }
@@ -1003,6 +1031,11 @@
     if (badge) { badge.hidden = !fresh; }
     $('#end-name').textContent = '「' + en.name + '」';
     $('#end-line').textContent = en.line;
+    const lifeEl = $('#end-life');
+    if (lifeEl && D.lifestyles) {
+      lifeEl.textContent = '你这一辈子 · ' +
+        D.lifestyles.order.map(function (dim) { return E.lifeOption(S, dim).name; }).join(' · ');
+    }
     const m = E.metrics(S);
     const rows = [
       ['终值存款', fmtMoney(m.cash), ''],
@@ -1211,6 +1244,7 @@
       rnd.setState(o.rndState || 1);
       o.rnd = rnd;
       S = o;
+      if (!S.life && D.lifestyles) S.life = Object.assign({}, D.lifestyles.defaults);
       if (!S.peers) S.peers = Sim.buildPeers(S.seed, 5);
       wantRun = false; running = false; stopTimer(); busy = false; autoStarted = true;
       show('s-play');
@@ -1233,8 +1267,12 @@
   function shareText() {
     const m = E.metrics(S);
     const en = S.ending || {};
+    const life = (D.lifestyles && S.life)
+      ? D.lifestyles.order.map(function (dim) { return E.lifeOption(S, dim).name; }).join(' · ')
+      : '';
     return '《工位》1 in 740 Million\n' +
       '我抽到了：' + S.draw.tier.name + ' · ' + S.draw.family.name + ' · ' + S.draw.industry.name + '\n' +
+      (life ? '生活方式：' + life + '\n' : '') +
       '学历：' + S.draw.edu + (S.gaokaoScore ? '（高考 ' + S.gaokaoScore + ' 分）' : '') +
         (S.flags.zkRepeat ? ' · 中考复读一年' : '') + (S.flags.repeatedGk ? ' · 高考复读一年' : '') + '\n' +
       (S.flags.overrideDone && S.flags.parentChangedMajor ? '志愿被家里改过\n' : '') +

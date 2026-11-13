@@ -11,7 +11,7 @@
   D.meta = {
     title: '工位',
     subtitle: '1 in 740 Million',
-    version: '0.5.1',
+    version: '0.6.0',
     region: 'CN',
     currency: 'CNY',
     symbol: '¥',
@@ -196,6 +196,49 @@
   };
   D.focusOrder = ['career', 'learn', 'network', 'health', 'family', 'side'];
 
+  // ---------------------------------------------------------------- 生活方式
+  // 和「今年的重心」不是一回事：重心是这一年把命花在哪，生活方式是长年累月怎么过。
+  // 数值按「每年」折算，学生阶段按 0.8 折算，成年后全额生效。
+  // health/spirit/relation 为每年增减；freedom 为每周可支配小时；misc 为杂项开销比例；cash 为每年额外固定开销。
+  D.lifestyles = {
+    order: ['sleep', 'body', 'spend', 'social'],
+    dims: {
+      sleep: {
+        id: 'sleep', name: '作息',
+        options: [
+          { id: 'early', name: '早睡早起', note: '十一点前躺下，六点半就醒', health: 0.35, spirit: 0.10, freedom: -3 },
+          { id: 'normal', name: '正常', note: '困了就睡，醒了就起', health: 0, spirit: 0, freedom: 0 },
+          { id: 'night', name: '熬夜', note: '夜里那几个小时才像自己的', health: -0.55, spirit: 0.45, freedom: 3 },
+        ],
+      },
+      body: {
+        id: 'body', name: '身体',
+        options: [
+          { id: 'gym', name: '每周运动', note: '健身房年卡 2,400', health: 0.55, spirit: 0.15, freedom: -3, cash: -2400 },
+          { id: 'walk', name: '偶尔动动', note: '通勤多走两站', health: 0.15, spirit: 0.05, freedom: -1 },
+          { id: 'sofa', name: '能坐不站', note: '下班就躺，周末也躺', health: -0.40, spirit: 0.05, freedom: 1 },
+        ],
+      },
+      spend: {
+        id: 'spend', name: '花钱',
+        options: [
+          { id: 'save', name: '能省则省', note: '外卖等满减，衣服等换季', spirit: -0.35, misc: -0.06 },
+          { id: 'normal', name: '量入为出', note: '该花的花，不欠账', health: 0, spirit: 0, misc: 0 },
+          { id: 'fun', name: '及时行乐', note: '喜欢就买，先爽再说', spirit: 0.40, relation: 0.15, misc: 0.07 },
+        ],
+      },
+      social: {
+        id: 'social', name: '社交',
+        options: [
+          { id: 'close', name: '常联系', note: '一个月聚一次，随份子', relation: 0.90, freedom: -2, cash: -1500 },
+          { id: 'normal', name: '有事再说', note: '不主动，也不拒绝', relation: 0, freedom: 0 },
+          { id: 'alone', name: '都断了', note: '微信只剩工作群', relation: -0.60, spirit: -0.20, freedom: 1 },
+        ],
+      },
+    },
+    defaults: { sleep: 'normal', body: 'walk', spend: 'normal', social: 'normal' },
+  };
+
   // ---------------------------------------------------------------- 结局
   D.endings = [
     { id: 'default', name: '普通地活着', line: '你没有成为谁的榜样，也没有成为谁的教训。' },
@@ -330,6 +373,18 @@
     ],
     promotion: ['你升了一级，工资涨了，会也多了。', '你被任命为小组负责人，从此要为别人的错误写检讨。', '你的名字出现在了新的组织架构图里，比上次大了一点。'],
     layoff: ['HR 约你"聊一聊"，会议室里有两杯水，只有一杯是给你的。', '你被"优化"了，补偿是 N+1，态度是 N-1。', '你的工位在一个周五下午被清空，绿植归了邻座。'],
+    // 按生活方式的选择偶尔冒一句，让设定有存在感
+    life: {
+      early: ['六点半醒的时候，天刚亮，楼下只有环卫工和早点摊。', '你十一点前就睡了，第二天脑子里难得没有雾。', '早睡这件事没什么可炫耀的，除了你真的做到了。'],
+      night: ['凌晨一点，你终于舍得关灯，然后又刷了二十分钟手机。', '夜里那几个小时是你的，代价写在第二天的黑眼圈上。', '你说"再看完这一集"，然后天亮了。'],
+      gym: ['你在跑步机上走了四十分钟，脑子里过了一遍不想回的消息。', '健身房的前台已经能叫出你的名字，这说明你来得不算少。', '练完那组深蹲，你觉得这周至少有一件事是做完的。'],
+      walk: ['你提前一站下地铁，走回去，路过三家没进去过的店。', '每天多走两站路，步数上去了，体重没动。'],
+      sofa: ['周五晚上你躺在沙发上刷到十二点，手机砸在脸上。', '你买了瑜伽垫，现在它铺在阳台上接灰。'],
+      save: ['你把购物车里的东西删到只剩两样，然后连那两样也删了。', '你算了这个月的账，发现自己其实不需要那么多东西。', '满减凑得比当年做数学题还认真。'],
+      fun: ['你买了一个其实用不上的东西，拆快递的时候确实开心了十分钟。', '这个月的工资又提前见底了，但你没觉得亏。'],
+      close: ['老同学约饭，你去了，聊到 eleven 点，回家时觉得世界没那么冷。', '你给一个很久没联系的朋友发了消息，他秒回"在"。', '份子钱一个月随了两次，但结婚的那个是你真朋友。'],
+      alone: ['群里在约饭，你看到了，没回。', '你的微信置顶是三个工作群。', '一个人吃饭已经不是事，一个人过节才刚开始有点像事。'],
+    },
   };
 
   G.GW.DATA = D;

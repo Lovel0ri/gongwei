@@ -316,6 +316,7 @@
     },
     {
       id: 'ev_borrow', tag: '生活', weight: 5, ageMin: 25, ageMax: 55,
+      need: function (S) { return S.stats.relation >= 35; },
       title: '朋友借钱',
       text: '一个很久没联系的朋友突然发来消息："在吗，有点事想跟你说。"',
       options: [
@@ -470,5 +471,13 @@
   ];
 
   // 事件按年龄/一次性过滤后做权重抽样
-  D.eventsMeta = { maxPerYear: 1 };
+  // 频率：学生阶段两年最多一次，成年后三年最多一次；再乘一个概率。
+  // 这样一条命大约弹出 6–8 张事件卡，而不是几乎每年一张。
+  D.eventsMeta = {
+    maxPerYear: 1,
+    minGapSchool: 2,
+    minGapAdult: 4,
+    chanceSchool: 0.42,
+    chanceAdult: 0.28,
+  };
 })();

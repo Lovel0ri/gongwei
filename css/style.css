@@ -225,6 +225,22 @@ body {
 .fin-row b { font-family: var(--mono); font-size: 14px; font-weight: 500; color: var(--text); }
 .fin-note { font-size: 10px; color: var(--text-3); margin-top: 5px; font-family: var(--mono); }
 
+/* ---------------- 生活方式 */
+.life-rows { padding: 8px 13px 0; display: flex; flex-direction: column; gap: 4px; }
+.life-row { display: grid; grid-template-columns: 24px 1fr; align-items: center; gap: 6px; }
+.life-k { font-size: 10px; color: var(--text-3); font-family: var(--mono); letter-spacing: .02em; }
+.life-chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.lchip {
+  appearance: none; cursor: pointer; border: 1px solid var(--line); background: var(--surface-2);
+  color: var(--text-2); border-radius: 999px; padding: 3px 7px;
+  font-family: var(--sans); font-size: 10.5px; line-height: 1.4; white-space: nowrap; transition: .14s;
+}
+.lchip:hover { border-color: var(--accent); color: var(--text); }
+.lchip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+.life-sum { margin: 9px 13px 0; padding: 8px 0 11px; border-top: 1px dashed var(--line); }
+.life-who { font-size: 11.5px; color: var(--text-2); line-height: 1.5; }
+.life-nums { font-size: 10px; color: var(--text-3); font-family: var(--mono); margin-top: 3px; line-height: 1.65; }
+
 /* ---------------- 场景 */
 .scene { overflow: hidden; }
 #scene {
@@ -333,6 +349,7 @@ body {
 }
 .opt .h { font-size: 11.5px; color: var(--text-3); margin-top: 3px; }
 .opt:disabled { opacity: .55; }
+.result { border-top: 1px solid var(--line-soft); margin-top: 6px; padding-top: 11px; }
 .result .line { font-size: 13.5px; line-height: 1.8; padding: 3px 0; color: var(--text-2); }
 .result .line.good { color: var(--green); }
 .result .line.bad { color: var(--red); }
@@ -343,6 +360,7 @@ body {
 .ending-inner { width: 100%; max-width: 640px; }
 .end-name { font-family: var(--serif); font-size: clamp(32px, 8vw, 50px); margin: 10px 0 6px; font-weight: 600; letter-spacing: .03em; }
 .end-line { color: var(--text-2); font-size: 15px; line-height: 1.9; margin: 0 0 24px; }
+.end-life { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); margin: -14px 0 22px; line-height: 1.7; }
 .end-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); margin-bottom: 28px; }
 .em { background: var(--surface); padding: 12px 14px; }
 .em .k { font-size: 10.5px; color: var(--text-3); letter-spacing: .08em; font-family: var(--mono); }
@@ -426,13 +444,14 @@ body.playing .theme-float { display: none; }
   .col { display: contents; }
   .col-center .scene { order: 1; }
   .col-center .focuscard { order: 2; }
-  .col-left .card:nth-child(2) { order: 3; }
-  .col-center .logcard { order: 4; min-height: 320px; }
-  .col-right .card:nth-child(1) { order: 5; }
-  .col-left .card:nth-child(1) { order: 6; }
-  .col-right .card:nth-child(2) { order: 7; }
-  .col-right .card:nth-child(3) { order: 8; }
-  .col-left .card:nth-child(3) { order: 9; }
+  .col-left .lifecard { order: 3; }
+  .col-left .card:nth-child(2) { order: 4; }
+  .col-center .logcard { order: 5; min-height: 320px; }
+  .col-right .card:nth-child(1) { order: 6; }
+  .col-left .card:nth-child(1) { order: 7; }
+  .col-right .card:nth-child(2) { order: 8; }
+  .col-right .card:nth-child(3) { order: 9; }
+  .col-left .card:nth-child(4) { order: 10; }
   .topbar { flex-wrap: wrap; gap: 8px; padding: 8px 10px; }
   .tb-right { width: 100%; justify-content: flex-start; gap: 5px; }
   .tbtn { padding: 7px 9px; font-size: 11.5px; min-height: 34px; }

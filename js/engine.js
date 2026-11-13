@@ -103,6 +103,10 @@
 
     draw.salary0 = 0;
 
+    // 生活方式：默认是最普通的过法，玩家随时可以改
+    S.life = Object.assign({}, (D.lifestyles && D.lifestyles.defaults) || {});
+    S.flags.lastEventAge = D.meta.startAge - 1;
+
     // ---- 身份：姓名、性别、父母
     const nm = D.names[region] || D.names.CN;
     const isF = rnd() < 0.48;
@@ -156,12 +160,50 @@
     return { gross, net, side: sideIncome || 0 };
   }
 
+  // ------------------------------------------------------------------ 生活方式
+  const LIFE = function () { return (D && D.lifestyles) || null; };
+  E.lifeOption = function (S, dim) {
+    const L = LIFE();
+    if (!L || !L.dims[dim]) return null;
+    const want = (S && S.life && S.life[dim]) || L.defaults[dim];
+    const list = L.dims[dim].options;
+    for (let i = 0; i < list.length; i++) if (list[i].id === want) return list[i];
+    return list[0];
+  };
+  // 当前生活方式折算成每年（以及每周）的净影响，界面上直接显示这一份
+  E.lifeTotals = function (S) {
+    const t = { health: 0, spirit: 0, relation: 0, freedom: 0, misc: 0, cash: 0 };
+    const L = LIFE();
+    if (!L) return t;
+    L.order.forEach(function (dim) {
+      const o = E.lifeOption(S, dim);
+      if (!o) return;
+      t.health += o.health || 0;
+      t.spirit += o.spirit || 0;
+      t.relation += o.relation || 0;
+      t.freedom += o.freedom || 0;
+      t.misc += o.misc || 0;
+      t.cash += o.cash || 0;
+    });
+    return t;
+  };
+  E.setLife = function (S, dim, id) {
+    const L = LIFE();
+    if (!L || !L.dims[dim]) return false;
+    const ok = L.dims[dim].options.some(function (o) { return o.id === id; });
+    if (!ok) return false;
+    if (!S.life) S.life = Object.assign({}, L.defaults);
+    S.life[dim] = id;
+    return true;
+  };
+
   // ------------------------------------------------------------------ 推进一年
   E.stepYear = function (S, focusId) {
     if (S.over) return { lines: [], event: null };
     const f = D.focus[focusId] || D.focus.career;
     const st = S.stats;
     const ind = S.draw.industry;
+    const lt = E.lifeTotals(S);
     const out = { lines: [], event: null, promoted: false, laid: false };
 
     S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
@@ -169,7 +211,8 @@
 
     // ---- 工时
     st.hours = clamp(ind.hours + f.hours + (age >= 45 ? -1 : 0), 28, 82);
-    st.freedom = round(168 - 56 - st.hours - (S.draw.tier.id === 't1' ? 8 : S.draw.tier.id === 't2' ? 6 : 5) - 4, 0);
+    st.freedom = round(168 - 56 - st.hours - (S.draw.tier.id === 't1' ? 8 : S.draw.tier.id === 't2' ? 6 : 5) - 4 + lt.freedom, 0);
+    st.freedom = clamp(st.freedom, 0, 120);
 
     // ---- 薪资成长
     const cycleAdj = 0.35 + ind.cycle * 0.95;
@@ -249,9 +292,14 @@
     }
     let miscRate = st.salary > 40000 ? 0.32 : st.salary > 20000 ? 0.24 : 0.18;
     if (S.flags.house) miscRate -= 0.05;
-    if (st.cash < 0) miscRate = 0.10;
+    miscRate = clamp(miscRate + lt.misc, 0.05, 0.45);
+    if (st.cash < 0) miscRate = Math.min(miscRate, 0.10);
     const misc = st.salary * miscRate * 12;
-    const netCash = inc.net + inc.side - (cost.living + cost.housing + cost.kid + cost.parents + misc);
+    // 生活方式的固定开销（健身卡、份子钱）：破产时先砍一半
+    let lifeSpend = Math.max(0, -(lt.cash || 0));
+    if (st.cash < 0) lifeSpend *= 0.5;
+    S.fin.life = round(lifeSpend);
+    const netCash = inc.net + inc.side - (cost.living + cost.housing + cost.kid + cost.parents + misc + lifeSpend);
     st.cash += netCash;
     if (st.cash < 0) { st.cash *= 1.04; }
 
@@ -282,7 +330,7 @@
 
     // ---- 健康
     const ageExtra = age >= 55 ? 0.95 : age >= 45 ? 0.55 : age >= 35 ? 0.15 : 0;
-    let dH = -0.06 - (st.hours - 45) * 0.035 - ageExtra * 0.75 + f.health;
+    let dH = -0.06 - (st.hours - 45) * 0.035 - ageExtra * 0.75 + f.health + lt.health;
     if (st.spirit < 25) dH -= 0.5;
     if (S.flags.kids > 0 && age < 40) dH -= 0.25;
     st.health = clamp(st.health + dH, 0, 100);
@@ -290,7 +338,7 @@
     // ---- 心气
     const mismatch = (1 - S.draw.major.match) * 0.55;
     const winter = ind.cycle < 0.5 ? 0.28 : 0;
-    let dS = -0.05 + f.spirit - mismatch - winter + (st.hours > 58 ? 0.25 : 0) + (st.relation > 60 ? 0.2 : 0);
+    let dS = -0.05 + f.spirit + lt.spirit - mismatch - winter + (st.hours > 58 ? 0.25 : 0) + (st.relation > 60 ? 0.2 : 0);
     if (S.flags.laidOff > 0) dS -= 0.2;
     st.spirit = clamp(st.spirit + dS, 0, 100);
 
@@ -300,7 +348,7 @@
     if (S.flags.freelance || S.flags.startup) dK += 0.5;
     dK *= clamp(1 - st.skill / (ceil + 8), 0, 1.15);
     st.skill = clamp(st.skill + dK, 0, 100);
-    st.relation = clamp(st.relation - 0.55 + f.relation * (1 - st.relation / 130) + (st.skill > 70 ? 0.2 : 0), 0, 100);
+    st.relation = clamp(st.relation - 0.55 + f.relation * (1 - st.relation / 130) + lt.relation + (st.skill > 70 ? 0.2 : 0), 0, 100);
 
     // ---- 状态快照（给同秒出生的人用）
     S.statusLog = S.statusLog || {};
@@ -323,6 +371,19 @@
     if (st.health < 25 && S.rnd() < 0.5) out.lines.push({ age, kind: 'warn', text: D.flavor.lowHealth[Math.floor(S.rnd() * D.flavor.lowHealth.length)] });
     if (st.spirit < 20 && S.rnd() < 0.5) out.lines.push({ age, kind: 'warn', text: D.flavor.lowSpirit[Math.floor(S.rnd() * D.flavor.lowSpirit.length)] });
     if (out.lines.length === 0 && S.rnd() < 0.45) out.lines.push({ age, kind: 'flavor', text: D.flavor.tick[Math.floor(S.rnd() * D.flavor.tick.length)] });
+
+    // ---- 生活方式的小痕迹：让玩家设的过法自己说话
+    if (S.rnd() < 0.26 && D.flavor.life) {
+      const dims = (D.lifestyles && D.lifestyles.order) || [];
+      if (dims.length) {
+        const dim = dims[Math.floor(S.rnd() * dims.length)];
+        const o = E.lifeOption(S, dim);
+        const pool = o && D.flavor.life[o.id];
+        if (pool && pool.length) {
+          out.lines.push({ age, kind: 'flavor', text: pool[Math.floor(S.rnd() * pool.length)] });
+        }
+      }
+    }
 
     // ---- 随机事件
     const ev = E.rollEvent(S);
@@ -397,6 +458,7 @@
     if (S.over) return { lines: [], event: null };
     const st = S.stats;
     const f = (D.focusSchool && D.focusSchool[focusId]) || D.focusSchool.study;
+    const lt = E.lifeTotals(S);
     const out = { lines: [], event: null };
     const age = S.age;
     S.year = (D.meta.startYear || 2026) + (S.age - D.meta.startAge);
@@ -411,22 +473,25 @@
     if (S.flags.boarding) gain += 0.3;
     st.academic = clamp(st.academic + gain, 0, 100);
 
-    st.health = clamp(st.health + (f.health || 0) - 0.15, 8, 100);
-    st.spirit = clamp(st.spirit + (f.spirit || 0), 6, 100);
-    st.relation = clamp(st.relation + (f.relation || 0) - 0.1, 0, 100);
+    // 生活方式在学生阶段只打八折：住家里，作息和花销都不完全由自己
+    st.health = clamp(st.health + (f.health || 0) + lt.health * 0.8 - 0.15, 8, 100);
+    st.spirit = clamp(st.spirit + (f.spirit || 0) + lt.spirit * 0.8, 6, 100);
+    st.relation = clamp(st.relation + (f.relation || 0) + lt.relation * 0.8 - 0.1, 0, 100);
     st.skill = clamp(st.skill + (f.skill || 0), 0, 100);
 
     // 时间：上课 + 作业 + 通勤
     const load = { study: 50, cram: 60, play: 42, love: 45, earn: 56, game: 44 }[f.id] || 48;
     st.hours = load;
-    st.freedom = Math.round(168 - 56 - load);
+    st.freedom = Math.round(168 - 56 - load + lt.freedom);
 
     // 钱：学费生活费，打工/帮家里补一点。学生阶段不背债。
     const cost = Math.round((inHigh ? (track.cost || 3000) : 1500) * (S.draw.tier.cost || 1));
-    st.cash += (f.cash || 0) - cost;
+    const lifeCost = Math.round(Math.max(0, -(lt.cash || 0)) * 0.3);
+    st.cash += (f.cash || 0) - cost - lifeCost;
     if (st.cash < -60000) st.cash = -60000;
     S.fin = S.fin || {};
-    S.fin.schoolCost = cost - (f.cash || 0);
+    S.fin.schoolCost = cost + lifeCost - (f.cash || 0);
+    S.fin.life = lifeCost;
 
     S.history.push({
       age: age, salary: 0, cash: Math.round(st.cash), health: round(st.health, 1),
@@ -471,8 +536,15 @@
   };
 
   // ------------------------------------------------------------------ 事件抽样
+  // 事件不是每年都有：先看冷却，再看概率。弹出得太密会变成"填空题"。
   E.rollEvent = function (S) {
-    if (S.rnd() > 0.55) return null;
+    const meta = D.eventsMeta || {};
+    const youth = S.age < 19;
+    const minGap = youth ? (meta.minGapSchool || 2) : (meta.minGapAdult || 3);
+    const chance = youth ? (meta.chanceSchool || 0.5) : (meta.chanceAdult || 0.42);
+    const last = (typeof S.flags.lastEventAge === 'number') ? S.flags.lastEventAge : (D.meta.startAge - minGap);
+    if (S.age - last < minGap) return null;
+    if (S.rnd() > chance) return null;
     const pool = D.events.filter(function (e) {
       if (S.done[e.id]) return false;
       if (e.ageMin && S.age < e.ageMin) return false;
@@ -481,7 +553,9 @@
       return true;
     });
     if (!pool.length) return null;
-    return pickWeighted(S.rnd, pool);
+    const ev = pickWeighted(S.rnd, pool);
+    S.flags.lastEventAge = S.age;
+    return ev;
   };
 
   // 事件选项生效
@@ -503,6 +577,7 @@
     if (eff.flags) Object.assign(S.flags, eff.flags);
 
     S.done[ev.id] = true;
+    S.flags.lastEventAge = S.age;
     if (o.log) lines.push({ age: S.age, kind: 'event', text: o.log });
     return { lines };
   };

@@ -22,14 +22,15 @@
   <!-- ============================ 封面 -->
   <section id="s-landing" class="screen active">
     <div class="landing-inner">
-      <div class="kicker">人生模拟器 · 中国 · v0.5.1</div>
+      <div class="kicker">人生模拟器 · 中国 · v0.6.0</div>
       <h1 class="title">工位</h1>
       <div class="subtitle">1 in 740 Million</div>
       <p class="lede">
         中国有约 7.4 亿就业人口。<br>
         你被随机丢进其中一个家庭，从初一坐到退休。<br>
         前六年你只干一件事：把成绩往上挪，换一张志愿表。<br>
-        之后还有十几次岔路，其余时间你只是在选：<em>今年把命花在哪。</em>
+        之后还有十几次岔路。除此之外，你可以决定<em>这一辈子怎么过</em>——
+        几点睡、动不动、钱怎么花、跟谁来往。这些不会弹窗，但每年都在算账。
       </p>
       <div class="landing-actions">
         <button id="btn-start" class="btn primary">随机出生</button>
@@ -100,6 +101,15 @@
           </div>
         </section>
 
+        <section class="card lifecard">
+          <div class="card-head">生活方式 <em>长期怎么过 · 随时可改</em></div>
+          <div class="life-rows" id="life-rows"></div>
+          <div class="life-sum">
+            <div class="life-who" id="life-who">—</div>
+            <div class="life-nums" id="life-nums">—</div>
+          </div>
+        </section>
+
         <section class="card finance">
           <div class="fin-row"><span id="fin-net-k">净资产</span><b id="fin-net">—</b></div>
           <div class="fin-row"><span id="fin-income-k">年收入</span><b id="fin-income">—</b></div>
@@ -154,6 +164,7 @@
       <div id="end-badge" class="end-badge" hidden>★ 新结局解锁</div>
       <h2 id="end-name" class="end-name">—</h2>
       <p id="end-line" class="end-line"></p>
+      <div id="end-life" class="end-life"></div>
       <div id="end-metrics" class="end-metrics"></div>
 
       <div class="chart-block">

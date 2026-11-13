@@ -86,10 +86,24 @@
     return scored[0].x;
   };
 
+  // 批量模拟：随机配一套生活方式（中间那一档更常见）
+  Sim.randomLife = function (S, rnd) {
+    const L = D.lifestyles;
+    if (!L) return;
+    S.life = S.life || {};
+    L.order.forEach(function (dim) {
+      const opts = L.dims[dim].options;
+      const r = rnd();
+      const idx = r < 0.30 ? 0 : (r < 0.75 ? 1 : 2);
+      S.life[dim] = opts[Math.min(idx, opts.length - 1)].id;
+    });
+  };
+
   // 跑完一生
   Sim.runLife = function (seed, opts) {
     opts = opts || {};
     const S = E.createLife(seed, opts.region);
+    if (opts.randomLife !== false) Sim.randomLife(S, S.rnd);
     Sim.runFrom(S, opts);
     return S;
   };
