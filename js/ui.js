@@ -426,12 +426,11 @@
     if (isStudent()) {
       const f = D.focusSchool[id];
       if (!f) return [];
-      const sg = function (n) { return (n > 0 ? '+' : '−') + (Math.abs(n) % 1 ? Math.abs(n).toFixed(1) : Math.abs(n)); };
       const out = [];
-      if (f.acad) out.push('成绩' + sg(f.acad));
-      if (f.cash) out.push((f.cash > 0 ? '钱+' : '钱−') + fmtWan(Math.abs(f.cash)));
-      if (f.health) out.push('健康' + sg(f.health));
-      if (f.spirit) out.push('心气' + sg(f.spirit));
+      if (f.acad) out.push('成绩' + dirStat(f.acad));
+      if (f.cash) out.push(f.cash > 0 ? '钱↑' : '钱↓');
+      if (f.health) out.push('健康' + dirStat(f.health));
+      if (f.spirit) out.push('心气' + dirStat(f.spirit));
       return out.slice(0, 3);
     }
     return D.focusTags[id] || [];
@@ -471,12 +470,6 @@
   function bindChips() { /* 事件委托已在 renderFocus 内绑定 */ }
 
   // ------------------------------------------------------------------ 生活方式
-  function lifeSign(n, unit) {
-    const v = Math.round(n * 100) / 100;
-    if (!v) return null;
-    const abs = Math.abs(v);
-    return (v > 0 ? '+' : '−') + (Math.abs(abs % 1) > 0.001 ? abs.toFixed(2) : abs.toFixed(0)) + (unit || '');
-  }
   let lifeSig = '';
   function renderLife() {
     const box = $('#life-rows');
@@ -519,37 +512,37 @@
     });
     const t = E.lifeTotals(S);
     const parts = [];
-    if (t.health) parts.push('健康 ' + lifeSign(t.health));
-    if (t.spirit) parts.push('心气 ' + lifeSign(t.spirit));
-    if (t.relation) parts.push('关系 ' + lifeSign(t.relation));
-    if (t.freedom) parts.push('自由 ' + lifeSign(t.freedom) + 'h/周');
-    if (t.misc) parts.push('杂项花销 ' + lifeSign(t.misc * 100, '%'));
-    if (t.cash) parts.push('固定花销 ' + fmtMoney(-t.cash) + '/年');
+    if (t.health) parts.push('健康' + dirYear(t.health));
+    if (t.spirit) parts.push('心气' + dirYear(t.spirit));
+    if (t.relation) parts.push('关系' + dirYear(t.relation));
+    if (t.freedom) parts.push('自由' + dirFree(t.freedom));
+    // 杂项比例和固定开销合起来看方向：省钱的过法每年存下的钱也是钱
+    const money = (t.cash || 0) + (t.misc || 0) * 120000;
+    if (money) parts.push('钱' + (money > 0 ? '↑' : '↓'));
     const nums = $('#life-nums');
     if (nums) nums.textContent = parts.length ? '每年：' + parts.join(' · ') : '每年：不增不减，随波逐流';
   }
 
 
   // ------------------------------------------------------------------ 生活账本
-  const SHOP_LABEL = { spirit: '心气', relation: '关系', health: '健康', skill: '能力', acad: '成绩' };
-  function shopDelta(n) {
-    const v = Math.abs(n);
-    return (n > 0 ? '+' : '−') + (Math.abs(v % 1) > 0.001 ? v.toFixed(1) : v);
-  }
   function shopEffectText(it) {
     const out = [];
     const e = it.eff || {};
-    Object.keys(SHOP_LABEL).forEach(function (k) {
-      if (e[k]) out.push(SHOP_LABEL[k] + ' ' + shopDelta(e[k]));
+    const one = [];
+    Object.keys(DIR).forEach(function (k) {
+      if (e[k]) one.push(DIR[k] + dirStat(e[k]));
     });
+    if (e.cash) one.push('钱' + dirCash(e.cash));
+    if (one.length) out.push(one.join(' · '));
     const p = it.perYear || {};
     const py = [];
-    Object.keys(SHOP_LABEL).forEach(function (k) {
-      if (p[k]) py.push(SHOP_LABEL[k] + ' ' + shopDelta(p[k]));
+    Object.keys(DIR).forEach(function (k) {
+      if (p[k]) py.push(DIR[k] + dirYear(p[k]));
     });
-    if (p.freedom) py.push('自由 ' + shopDelta(p.freedom) + 'h');
-    if (it.risk) py.push(Math.round(it.risk * 100) + '% 事故');
+    if (p.freedom) py.push('自由' + dirFree(p.freedom));
+    if (p.cash) py.push('钱↓');
     if (py.length) out.push('之后每年 ' + py.join(' · '));
+    if (it.risk) out.push('每年有事故风险');
     return out.join(' · ');
   }
 
@@ -635,9 +628,9 @@
     if (sum) {
       const parts = [];
       if (t.cash) parts.push(fmtMoney(-t.cash));
-      if (t.health) parts.push('健康 ' + shopDelta(t.health));
-      if (t.spirit) parts.push('心气 ' + shopDelta(t.spirit));
-      if (t.relation) parts.push('关系 ' + shopDelta(t.relation));
+      if (t.health) parts.push('健康' + dirYear(t.health));
+      if (t.spirit) parts.push('心气' + dirYear(t.spirit));
+      if (t.relation) parts.push('关系' + dirYear(t.relation));
       sum.textContent = '这套规矩每年：' + (parts.length ? parts.join(' · ') : '不增不减');
     }
   }
@@ -989,33 +982,44 @@
   function hex(c) { return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)]; }
 
   // ------------------------------------------------------------------ 节点 / 事件
+  // 增减只给方向，不给数值：三档箭头，让玩家凭直觉权衡，而不是做算术。
+  const DIR = { acad: '成绩', skill: '能力', health: '健康', spirit: '心气', relation: '关系' };
+  function arrows(v, mid, high) {
+    const a = Math.abs(v);
+    const n = a >= high ? 3 : a >= mid ? 2 : 1;
+    return (v > 0 ? '↑' : '↓').repeat(n);
+  }
+  function dirStat(v) { return arrows(v, 3, 7); }
+  function dirCash(v) { return arrows(v, 5000, 50000); }
+  function dirYear(v) { return arrows(v, 0.4, 1.0); }
+  function dirRate(v) { return arrows(v, 0.1, 0.3); }
+  function dirFree(v) { return arrows(v, 3, 7); }   // 自由是每周小时数，量纲和属性点不同
+  // 纯方向的老提示（"成绩↑ 心气↓"）不再重复显示，交给自动生成的增减行
+  function isDirOnly(hint) {
+    return /^([^\s·]{1,5}[↑↓]+[\s·]*)+$/.test(String(hint || '').trim());
+  }
+
   function effectText(opt) {
     if (!opt) return '';
     const eff = opt.eff || {};
     const sp = opt.special || eff.special;
     const out = [];
-    const sg = function (n) { return (n > 0 ? '+' : '−') + Math.abs(n); };
-    if (eff.acad) out.push('成绩' + sg(eff.acad));
-    if (eff.skill) out.push('能力' + sg(eff.skill));
-    if (eff.health) out.push('健康' + sg(eff.health));
-    if (eff.spirit) out.push('心气' + sg(eff.spirit));
-    if (eff.relation) out.push('关系' + sg(eff.relation));
-    if (eff.cash) out.push((eff.cash > 0 ? '钱+' : '钱−') + fmtWan(Math.abs(eff.cash)));
-    if (eff.salaryMul) out.push('月薪' + (eff.salaryMul >= 1 ? '+' : '−') + Math.round(Math.abs(eff.salaryMul - 1) * 100) + '%');
+    ['acad', 'skill', 'health', 'spirit', 'relation'].forEach(function (k) {
+      if (eff[k]) out.push(DIR[k] + dirStat(eff[k]));
+    });
+    if (eff.cash) out.push('钱' + dirCash(eff.cash));
+    if (eff.salaryMul) out.push('月薪' + dirRate(eff.salaryMul - 1));
     if (eff.track) out.push('→ ' + ((D.schoolTracks[eff.track] || {}).name || eff.track));
     if (eff.edu) out.push('→ ' + eff.edu);
-    if (eff.startSalary) out.push('起薪 ¥' + eff.startSalary);
+    if (eff.startSalary) out.push('开始有工资');
     if (eff.majorGroup) out.push('专业重抽');
     if (sp) {
+      // 只留"数值说不清"的那些；能从 eff 推出来的不再重复
       const SP = {
-        exam: '上岸率 < 10%', exam35: '年龄窗口只剩两年', grad: '多读三年',
-        house_big: '首付 + 30 年房贷', house_small: '回省会，工资降',
-        kid: '钱 / 时间 / 心气一起扣', freelance: '收入从此不稳', startup: '高方差，可能归零',
-        retireEarly: '提前退场', repeat_zk: '多读一年 + 9,000', repeat_gk: '多读一年 + 2.5 万',
-        override_obey: '关系 +5 · 心气 −7', override_fight: '50% 被发现',
-        override_teacher: '花 8,000 · 成功率 72%',
+        grad: '多读三年', freelance: '收入从此不稳', startup: '高方差，可能归零',
+        retireEarly: '提前退场',
       };
-      out.push(SP[sp] || '要赌一次');
+      if (SP[sp]) out.push(SP[sp]);
     }
     if (eff.flags) {
       if (eff.flags.partner) out.push('有伴侣');
@@ -1048,8 +1052,9 @@
       const b = document.createElement('button');
       b.className = 'opt';
       const cost = effectText(x.o);
+      const hintOk = x.o.hint && !isDirOnly(x.o.hint) && cost.indexOf(x.o.hint) < 0;
       b.innerHTML = '<div class="t"><span class="num">' + (i + 1) + '</span>' + x.o.label + '</div>' +
-        (x.o.hint ? '<div class="h">' + x.o.hint + '</div>' : '') +
+        (hintOk ? '<div class="h">' + x.o.hint + '</div>' : '') +
         (cost ? '<div class="cost">' + cost + '</div>' : '');
       b.onclick = function () { choose(x); };
       box.appendChild(b);

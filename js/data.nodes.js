@@ -201,7 +201,7 @@
           log: '你买了南下的火车票。站了 19 个小时，下车时觉得这座城市很高。',
         },
         {
-          id: 'repeatGk', label: '复读一年，明年再考', hint: '多花一年和 2.5 万复读费，再赌一次',
+          id: 'repeatGk', label: '复读一年，明年再考', hint: '多花一年和一笔复读费，再赌一次',
           show: function (S) { return !S.flags.repeatedGk && ['sn', 'sz', 's2'].indexOf(S.draw.score.id) >= 0; },
           eff: { special: 'repeat_gk' }, log: '',
         },
@@ -348,7 +348,7 @@
           (S.flags.partner ? '你们讨论过三次，每次都停在"再想想"。' : '你连讨论的对象都还没有，但催的人在变多。');
       },
       options: [
-        { id: 'kid', label: '生', hint: '钱、时间、心气，三样一起扣', special: 'kid', eff: { spirit: 2, relation: 3, health: -3 }, log: '' },
+        { id: 'kid', label: '生', hint: '钱、时间、健康，三样一起扣', special: 'kid', eff: { spirit: 2, relation: 3, health: -3 }, log: '' },
         { id: 'nokid', label: '不生', hint: '轻松，但要扛住所有人的嘴', eff: { spirit: 4, relation: -5, cash: 40000 }, log: '你说"我们不打算要"。你妈沉默了三秒，然后说"你们自己决定"。' },
         { id: 'later', label: '再等三年', hint: '身体成本会替你决定', eff: { spirit: 1, health: -2, flags: { kidLater: true } }, log: '你说"35 岁之前一定"。这句话你自己都不太信。' },
       ],

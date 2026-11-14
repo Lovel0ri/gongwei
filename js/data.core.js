@@ -11,7 +11,7 @@
   D.meta = {
     title: '工位',
     subtitle: '1 in 740 Million',
-    version: '0.7.1',
+    version: '0.8.0',
     region: 'CN',
     currency: 'CNY',
     symbol: '¥',
@@ -214,7 +214,7 @@
       body: {
         id: 'body', name: '身体',
         options: [
-          { id: 'gym', name: '每周运动', note: '健身房年卡 2,400', health: 0.55, spirit: 0.15, freedom: -3, cash: -2400 },
+          { id: 'gym', name: '每周运动', note: '健身房年卡，一年下来不便宜', health: 0.55, spirit: 0.15, freedom: -3, cash: -2400 },
           { id: 'walk', name: '偶尔动动', note: '通勤多走两站', health: 0.15, spirit: 0.05, freedom: -1 },
           { id: 'sofa', name: '能坐不站', note: '下班就躺，周末也躺', health: -0.40, spirit: 0.05, freedom: 1 },
         ],
@@ -358,31 +358,31 @@
         id: 'save', name: '资金存放',
         options: [
           { id: 'cash', name: '放家里', note: '没有利息，也不会亏', cash: 0 },
-          { id: 'bank', name: '存银行', note: '每年 1.5% 利息', cash: 0 },
-          { id: 'fund', name: '买基金', note: '平均 4%，但会亏', cash: 0 },
+          { id: 'bank', name: '存银行', note: '有一点利息，不会亏', cash: 0 },
+          { id: 'fund', name: '买基金', note: '可能赚，也可能亏', cash: 0 },
         ],
       },
       gift: {
         id: 'gift', name: '红白包',
         options: [
-          { id: 'full', name: '包足', note: '每年 2,000 · 关系 +0.6', cash: -2000, relation: 0.6 },
-          { id: 'half', name: '包一半', note: '每年 1,000 · 关系 +0.1', cash: -1000, relation: 0.1 },
-          { id: 'none', name: '只到场', note: '不花钱 · 关系 −0.4', cash: 0, relation: -0.4 },
+          { id: 'full', name: '包足', note: '每年包一笔 · 关系↑', cash: -2000, relation: 0.6 },
+          { id: 'half', name: '包一半', note: '每年包一半 · 关系略↑', cash: -1000, relation: 0.1 },
+          { id: 'none', name: '只到场', note: '不花钱 · 关系↓', cash: 0, relation: -0.4 },
         ],
       },
       insure: {
         id: 'insure', name: '保险',
         options: [
           { id: 'basic', name: '基本保障', note: '不花钱 · 看病全自付', cash: 0 },
-          { id: 'full', name: '保得完整', note: '每年 1,800 · 健康 +0.15 · 医疗事件自付减半', cash: -1800, health: 0.15 },
+          { id: 'full', name: '保得完整', note: '每年缴保费 · 健康↑ · 医疗自付减半', cash: -1800, health: 0.15 },
         ],
       },
       diet: {
         id: 'diet', name: '饮食习惯',
         options: [
           { id: 'same', name: '和周围一样', note: '不增不减', cash: 0 },
-          { id: 'healthy', name: '少盐多菜', note: '每年 1,200 · 健康 +0.5', cash: -1200, health: 0.5 },
-          { id: 'takeout', name: '常外食外送', note: '每年 2,400 · 健康 −0.5 · 心气 +0.3', cash: -2400, health: -0.5, spirit: 0.3 },
+          { id: 'healthy', name: '少盐多菜', note: '买菜贵一点 · 健康↑', cash: -1200, health: 0.5 },
+          { id: 'takeout', name: '常外食外送', note: '花费多 · 健康↓ · 心气↑', cash: -2400, health: -0.5, spirit: 0.3 },
         ],
       },
     },
