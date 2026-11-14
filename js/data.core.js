@@ -11,7 +11,7 @@
   D.meta = {
     title: '工位',
     subtitle: '1 in 740 Million',
-    version: '0.8.0',
+    version: '0.9.0',
     region: 'CN',
     currency: 'CNY',
     symbol: '¥',
@@ -78,11 +78,12 @@
   // 实际分布由学生阶段的选择决定（见 engine.rollGaokao）。
   D.scores = {
     CN: [
-      { id: 's985', name: '够 985', min: 84, edu: '本科' },
-      { id: 's1', name: '够一本', min: 70, edu: '本科' },
-      { id: 's2', name: '够二本', min: 55, edu: '本科' },
-      { id: 'sz', name: '够专科', min: 36, edu: '专科' },
-      { id: 'sn', name: '够不上', min: 4, edu: '高中' },
+      // short：头像卡/结算里用的短名；mul：起薪系数（同是本科，学校还是不一样）
+      { id: 's985', name: '够 985', short: '985', min: 84, edu: '本科', mul: 1.15 },
+      { id: 's1', name: '够一本', short: '一本', min: 70, edu: '本科', mul: 1.06 },
+      { id: 's2', name: '够二本', short: '二本', min: 55, edu: '本科', mul: 1.0 },
+      { id: 'sz', name: '够专科', short: '专科', min: 36, edu: '专科', mul: 1.0 },
+      { id: 'sn', name: '够不上', short: '没上线', min: 4, edu: '高中', mul: 1.0 },
     ],
   };
 

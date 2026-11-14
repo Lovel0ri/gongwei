@@ -818,7 +818,9 @@
   E.salary0 = function (S) {
     const d = S.draw;
     const edu = D.edus[d.edu] || D.edus['高中'];
-    return Math.round(6200 * (d.tier.salaryMul || 1) * edu.mul * d.industry.mul * d.role.mul *
+    // 同是本科，985 / 一本 / 二本的起薪不一样：这一条让前六年的努力真的能换钱
+    const school = (d.score && d.score.mul) || 1;
+    return Math.round(6200 * (d.tier.salaryMul || 1) * edu.mul * school * d.industry.mul * d.role.mul *
       (1 + (S.stats.skill - 20) / 400));
   };
   // 行业和岗位在出生时就定了，但直到第一份工作才揭晓

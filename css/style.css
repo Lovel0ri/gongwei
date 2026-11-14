@@ -332,7 +332,7 @@ body {
 .lrow:hover .ls { color: var(--text-3); }
 .lrow.good .lt { color: var(--green); }
 .lrow.bad .lt, .lrow.warn .lt { color: var(--red); }
-.lrow.event .lt { color: var(--text); }
+.lrow.event .lt, .lrow.node .lt { color: var(--text); }
 .lrow.summary .lt { color: var(--text-3); font-family: var(--mono); font-size: 11px; }
 
 /* ---------------- 家人 / 同秒 */
@@ -410,8 +410,10 @@ body {
 #s-ending { padding: 34px 20px 60px; align-items: center; }
 .ending-inner { width: 100%; max-width: 640px; }
 .end-name { font-family: var(--serif); font-size: clamp(32px, 8vw, 50px); margin: 10px 0 6px; font-weight: 600; letter-spacing: .03em; }
-.end-line { color: var(--text-2); font-size: 15px; line-height: 1.9; margin: 0 0 24px; }
-.end-life { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); margin: -14px 0 22px; line-height: 1.7; }
+.end-line { color: var(--text-2); font-size: 15px; line-height: 1.9; margin: 0 0 12px; }
+.end-recap { color: var(--text-2); font-size: 13.5px; line-height: 1.9; margin: 0 0 10px; }
+.end-recap b { color: var(--text); font-weight: 500; }
+.end-life { font-family: var(--mono); font-size: 11.5px; color: var(--text-3); margin: 0 0 24px; line-height: 1.7; }
 .end-metrics { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1px; background: var(--line-soft); border: 1px solid var(--line-soft); margin-bottom: 28px; }
 .em { background: var(--surface); padding: 12px 14px; }
 .em .k { font-size: 10.5px; color: var(--text-3); letter-spacing: .08em; font-family: var(--mono); }

@@ -1070,8 +1070,11 @@
   function pickNodeOption(node, x) {
     if (!x) return;
     $$('.opt').forEach(function (b) { b.disabled = true; });
+    const at = S.age;
     const res = E.applyNodeOption(S, node.id, x.i);
     (res.lines || []).forEach(function (l) { S.log.push({ age: S.age, kind: l.kind, text: l.text }); });
+    // 标题最后写：日志是最新的在前，这样它才会显示在这一组结果的上方
+    S.log.push({ age: at, kind: 'node', text: '▶ ' + node.title });
     renderAll();
     save();
     showResult(res.lines || [], function () {
@@ -1120,6 +1123,7 @@
         $$('.opt').forEach(function (x) { x.disabled = true; });
         const r = E.applyEvent(S, ev, i);
         (r.lines || []).forEach(function (l) { S.log.push({ age: S.age, kind: l.kind, text: l.text }); });
+        S.log.push({ age: S.age, kind: 'event', text: '❖ ' + ev.title });
         renderAll();
         save();
         showResult(r.lines || [], function () {
@@ -1195,6 +1199,8 @@
     if (badge) { badge.hidden = !fresh; }
     $('#end-name').textContent = '「' + en.name + '」';
     $('#end-line').textContent = en.line;
+    const recEl = $('#end-recap');
+    if (recEl) { const txt = lifeRecap(); recEl.textContent = txt; recEl.hidden = !txt; }
     const lifeEl = $('#end-life');
     if (lifeEl && D.lifestyles) {
       lifeEl.textContent = '你这一辈子 · ' +
@@ -1225,6 +1231,51 @@
     ]);
     drawLifeline($('#lifeline'), S.history);
     renderSameSecond();
+  }
+
+
+  // 结算页那句"你这一辈子"：只从已有 flags 拼，不新增状态
+  function lifeRecap() {
+    const f = S.flags || {}, d = S.draw || {};
+    const edu = [], work = [], life = [], rough = [];
+    // 学历
+    if (S.gaokaoScore) {
+      const sc = (d.score && d.score.short) || '';
+      edu.push('高考 ' + S.gaokaoScore + ' 分' + (sc ? '，' + sc : ''));
+    } else if (f.track === 'voc') edu.push('读了职高，没走高考');
+    else if (f.track === 'tech') edu.push('读了中专，没走高考');
+    else if (f.track === 'none') edu.push('十五岁就不读了');
+    if (f.zkRepeat) edu.push('中考复读过一年');
+    if (f.repeatedGk) edu.push('高考复读过一年');
+    if (d.edu === '硕士') edu.push('后来读了硕士');
+    // 工作
+    if (d.industry) work.push('第一份工作进了' + d.industry.name + (d.role ? '，做' + d.role.name : ''));
+    if (f.bigCo) work.push('去的是大厂');
+    if (f.expat) work.push('外派过几年');
+    if (f.civil) work.push('后来考上了编制');
+    if (f.manager) work.push('转了管理');
+    if (f.expert) work.push('成了那种"这块只有他懂"的人');
+    if (f.startup) work.push('创过业');
+    if (f.bossExit) work.push('公司被收购了');
+    if (f.freelance) work.push('辞职做了自由职业');
+    if (f.mba) work.push('读了 MBA');
+    if (f.parentChangedMajor) work.push('志愿被家里改过');
+    // 生活
+    if (f.house) life.push('买了房');
+    else if (f.soldHouse) life.push('买过房又卖了');
+    else if (f.twoHouses) life.push('老家拆迁分了两套');
+    else life.push('一直租房');
+    if (f.kids) life.push('有了 ' + f.kids + ' 个孩子');
+    else if (S.age > 34) life.push('没要孩子');
+    if (f.seekingUntil) life.push('认真找过对象');
+    // 波折
+    if (f.laidOff) rough.push('被裁过 ' + f.laidOff + ' 次');
+    if (f.pivotCount) rough.push('换过 ' + f.pivotCount + ' 次赛道');
+    const groups = [edu, work, life, rough].filter(function (g) { return g.length; });
+    const n = groups.reduce(function (a, g) { return a + g.length; }, 0);
+    if (n < 3) return '';
+    return groups.map(function (g) { return g.join('，'); }).join('；') +
+      (S.age < D.meta.retireAge ? '；' + S.age + ' 岁提前退场。' : '。');
   }
 
   function setupCanvas(cv, cssH) {
