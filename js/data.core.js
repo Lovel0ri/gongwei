@@ -11,7 +11,7 @@
   D.meta = {
     title: '工位',
     subtitle: '1 in 740 Million',
-    version: '0.6.0',
+    version: '0.7.0',
     region: 'CN',
     currency: 'CNY',
     symbol: '¥',
@@ -237,6 +237,156 @@
       },
     },
     defaults: { sleep: 'normal', body: 'walk', spend: 'normal', social: 'normal' },
+  };
+
+
+  // ---------------------------------------------------------------- 生活账本
+  // 一次性添置 + 长年设定 + 每年自动。价格按 2020 年代中国大陆物价近似。
+  // eff 为买下时立刻生效；perYear 为之后每年生效；risk 为每年的意外概率。
+  D.spendingGroups = [
+    { id: 'hobby', name: '嗜好 · 宠物' },
+    { id: 'home', name: '家电 · 耐用品' },
+    { id: 'ride', name: '出行' },
+    { id: 'social', name: '吃饭 · 送礼' },
+    { id: 'travel', name: '旅行' },
+    { id: 'skill', name: '证照 · 进修' },
+    { id: 'love', name: '感情' },
+    { id: 'live', name: '居住 · 移居' },
+    { id: 'give', name: '公益' },
+  ];
+
+  D.hobbies = [
+    { id: 'fishing', name: '钓鱼', spirit: 0.40, skill: 0.2, note: '一坐一整天，什么也不想' },
+    { id: 'photo', name: '摄影', spirit: 0.45, skill: 0.25, note: '相机比手机贵，出片比相机难' },
+    { id: 'running', name: '跑步', spirit: 0.35, health: 0.35, note: '五公里之后，脑子是空的' },
+    { id: 'guitar', name: '吉他', spirit: 0.50, skill: 0.2, note: '会三个和弦就能唱很多歌' },
+    { id: 'baking', name: '烘焙', spirit: 0.40, skill: 0.2, note: '做一次，洗一小时' },
+    { id: 'hiking', name: '爬山', spirit: 0.45, health: 0.3, note: '山上没信号，也没人找你' },
+    { id: 'badminton', name: '羽毛球', spirit: 0.35, health: 0.4, relation: 0.3, note: '订场地比打球累' },
+    { id: 'football', name: '看球', spirit: 0.50, relation: 0.4, note: '凌晨三点，啤酒和骂声' },
+    { id: 'plants', name: '养花', spirit: 0.40, note: '死了三盆之后，第四盆活了' },
+    { id: 'calligraphy', name: '书法', spirit: 0.35, skill: 0.25, note: '心静下来的时候才写得动' },
+  ];
+
+  D.spending = [
+    // ------------------------------------------------ 嗜好 · 宠物
+    { id: 'hobby_new', group: 'hobby', name: '寻找新的兴趣', price: 466, kind: 'hobby',
+      desc: '最多三个，每个兴趣每年都会给你一点心气' },
+    { id: 'hobby_gear', group: 'hobby', name: '兴趣装备 · 课程', price: 1165, cooldown: 2,
+      desc: '给现有的兴趣添点装备、报个班', eff: { skill: 2, spirit: 1 },
+      need: function (S) { return (S.hobbies || []).length > 0; }, needWhy: '先得有个兴趣' },
+    { id: 'pet', group: 'hobby', name: '养宠物', price: 1800, once: true,
+      desc: '粮、猫砂、打针、寄养，一年到头都在花钱',
+      eff: { spirit: 1, relation: 1 }, perYear: { cash: -2400, spirit: 0.5, relation: 0.35 } },
+
+    // ------------------------------------------------ 家电
+    { id: 'tv', group: 'home', name: '电视 · 冰箱', price: 6410, once: true,
+      desc: '客厅终于有点声音了', eff: { spirit: 3 }, perYear: { spirit: 0.15 } },
+    { id: 'ac', group: 'home', name: '空调', price: 3200, once: true,
+      desc: '夏天总算能睡着', eff: { spirit: 2 }, perYear: { health: 0.2 } },
+    { id: 'washer', group: 'home', name: '洗衣机', price: 2600, once: true,
+      desc: '阳台空出来一块', eff: { spirit: 1 }, perYear: { freedom: 1 } },
+
+    // ------------------------------------------------ 出行
+    { id: 'bike', group: 'ride', name: '自行车', price: 1602, once: true,
+      desc: '通勤路上能出点汗', eff: { spirit: 2 }, perYear: { health: 0.45 } },
+    { id: 'ebike', group: 'ride', name: '电动自行车', price: 3500, once: true,
+      desc: '不怕堵车，也不怕迟到', eff: { spirit: 2 }, perYear: { freedom: 2, health: 0.1 } },
+    { id: 'moto', group: 'ride', name: '机车', price: 13888, once: true,
+      desc: '快，帅，也危险', eff: { spirit: 4 }, perYear: { health: -0.2 }, risk: 0.03 },
+
+    // ------------------------------------------------ 吃饭 · 送礼
+    { id: 'dinner', group: 'social', name: '和家人朋友聚餐 · 送礼', price: 699, cooldown: 1,
+      desc: '一个月见一次，聊的还是那些', eff: { relation: 3, spirit: 1 } },
+    { id: 'treat', group: 'social', name: '请朋友们大吃一顿', price: 583, cooldown: 1,
+      desc: '散场的时候有人拍你肩膀', eff: { relation: 5 } },
+
+    // ------------------------------------------------ 旅行
+    { id: 'travel_cn', group: 'travel', name: '国内旅游', price: 1398, cooldown: 1,
+      desc: '换个地方待几天', eff: { spirit: 1.5, skill: 0.5 } },
+    { id: 'travel_abroad', group: 'travel', name: '出国旅游', price: 27173, cooldown: 2,
+      desc: '护照终于用上了', eff: { spirit: 2, skill: 1 } },
+
+    // ------------------------------------------------ 证照 · 进修
+    { id: 'cert', group: 'skill', name: '证照 · 职训课程', price: 3495, once: true,
+      desc: '考完证，简历上多一行', eff: { skill: 3, spirit: 0.3 }, perYear: { skill: 0.3 } },
+    { id: 'train_tech', group: 'skill', name: '职业训练：技术 · 维修', price: 1864, once: true,
+      desc: '手上多一门手艺', eff: { skill: 4 } },
+    { id: 'train_cook', group: 'skill', name: '职业训练：烹饪 · 美容美发', price: 1864, once: true,
+      desc: '至少以后饿不着', eff: { skill: 3, spirit: 0.5 } },
+    { id: 'train_care', group: 'skill', name: '职业训练：照护', price: 1864, once: true,
+      desc: '照顾人是一门手艺', eff: { skill: 3, relation: 2 } },
+    { id: 'train_office', group: 'skill', name: '职业训练：文书 · 电脑', price: 1864, once: true,
+      desc: '表格、文档、打印机会卡纸', eff: { skill: 3 } },
+    { id: 'flight', group: 'skill', name: '飞行学校（飞行员执照 · 约两年）', price: 1180000, once: true,
+      desc: '两年，学费够在小城买套房', eff: { skill: 15, spirit: 3 }, perYear: { skill: 0.5 } },
+    { id: 'arabic', group: 'skill', name: '阿拉伯语课（移民准备）', price: 932, once: true,
+      desc: '移民准备 · 也许哪天用得上', eff: { skill: 2 } },
+
+    // ------------------------------------------------ 感情
+    { id: 'partner', group: 'love', name: '主动寻找对象', price: 466, cooldown: 1, kind: 'partner',
+      desc: '请人介绍、参加聚会，之后三年遇到人的概率上升' },
+
+    // ------------------------------------------------ 居住 · 移居
+    { id: 'moveout', group: 'live', name: '搬出父母家自己住', price: 3495, once: true, kind: 'moveout',
+      desc: '押金 + 添置家当，之后的生活费自己负担',
+      eff: { spirit: 3, relation: -2 }, perYear: { cash: -4200, spirit: 0.4 } },
+    { id: 'movecity', group: 'live', name: '搬家 · 移居（搬去更大的城市）', price: 2330, once: true, kind: 'movecity',
+      desc: '去更大的城市，房租和工资一起涨' },
+    { id: 'abroaddoor', group: 'live', name: '打听到国外工作的门路', price: 466, once: true, kind: 'abroad',
+      desc: '托人打听，先知道路在哪', eff: { skill: 1 } },
+
+    // ------------------------------------------------ 公益
+    { id: 'donate', group: 'give', name: '捐款', price: 1165, cooldown: 1,
+      desc: '钱去了该去的地方', eff: { spirit: 3, relation: 2 } },
+  ];
+
+  // 每年自动执行的几件事（开启后，存款超过费用三倍才做）
+  D.autoShop = [
+    { id: 'dinner', name: '和家人朋友聚餐 · 送礼', every: 1 },
+    { id: 'donate', name: '捐款', every: 1 },
+    { id: 'travel_cn', name: '国内旅游', every: 2 },
+    { id: 'cert', name: '证照 · 职训课程', every: 2 },
+  ];
+
+  // ---------------------------------------------------------------- 生活设定（长期）
+  // 和「生活方式」的区别：生活方式是态度（几点睡、钱怎么花），这里是账上的规矩。
+  D.policies = {
+    order: ['save', 'gift', 'insure', 'diet'],
+    dims: {
+      save: {
+        id: 'save', name: '资金存放',
+        options: [
+          { id: 'cash', name: '放家里', note: '没有利息，也不会亏', cash: 0 },
+          { id: 'bank', name: '存银行', note: '每年 1.5% 利息', cash: 0 },
+          { id: 'fund', name: '买基金', note: '平均 4%，但会亏', cash: 0 },
+        ],
+      },
+      gift: {
+        id: 'gift', name: '红白包',
+        options: [
+          { id: 'full', name: '包足', note: '每年 2,000 · 关系 +0.6', cash: -2000, relation: 0.6 },
+          { id: 'half', name: '包一半', note: '每年 1,000 · 关系 +0.1', cash: -1000, relation: 0.1 },
+          { id: 'none', name: '只到场', note: '不花钱 · 关系 −0.4', cash: 0, relation: -0.4 },
+        ],
+      },
+      insure: {
+        id: 'insure', name: '保险',
+        options: [
+          { id: 'basic', name: '基本保障', note: '不花钱 · 看病全自付', cash: 0 },
+          { id: 'full', name: '保得完整', note: '每年 1,800 · 健康 +0.15 · 医疗事件自付减半', cash: -1800, health: 0.15 },
+        ],
+      },
+      diet: {
+        id: 'diet', name: '饮食习惯',
+        options: [
+          { id: 'same', name: '和周围一样', note: '不增不减', cash: 0 },
+          { id: 'healthy', name: '少盐多菜', note: '每年 1,200 · 健康 +0.5', cash: -1200, health: 0.5 },
+          { id: 'takeout', name: '常外食外送', note: '每年 2,400 · 健康 −0.5 · 心气 +0.3', cash: -2400, health: -0.5, spirit: 0.3 },
+        ],
+      },
+    },
+    defaults: { save: 'bank', gift: 'full', insure: 'basic', diet: 'same' },
   };
 
   // ---------------------------------------------------------------- 结局

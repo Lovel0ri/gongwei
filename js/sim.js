@@ -89,14 +89,34 @@
   // 批量模拟：随机配一套生活方式（中间那一档更常见）
   Sim.randomLife = function (S, rnd) {
     const L = D.lifestyles;
-    if (!L) return;
-    S.life = S.life || {};
-    L.order.forEach(function (dim) {
-      const opts = L.dims[dim].options;
-      const r = rnd();
-      const idx = r < 0.30 ? 0 : (r < 0.75 ? 1 : 2);
-      S.life[dim] = opts[Math.min(idx, opts.length - 1)].id;
-    });
+    if (L) {
+      S.life = S.life || {};
+      L.order.forEach(function (dim) {
+        const opts = L.dims[dim].options;
+        const r = rnd();
+        const idx = r < 0.30 ? 0 : (r < 0.75 ? 1 : 2);
+        S.life[dim] = opts[Math.min(idx, opts.length - 1)].id;
+      });
+    }
+    const P = D.policies;
+    if (P) {
+      S.policy = S.policy || {};
+      P.order.forEach(function (dim) {
+        const opts = P.dims[dim].options;
+        const r = rnd();
+        const idx = r < 0.45 ? 0 : (r < 0.8 ? 1 : 2);
+        S.policy[dim] = opts[Math.min(idx, opts.length - 1)].id;
+      });
+    }
+  };
+
+  // 批量模拟：手头有钱就买点东西（只买买得起的）
+  Sim.maybeShop = function (S, rnd) {
+    const pool = (D.spending || []).filter(function (it) { return E.canBuy(S, it).ok; });
+    if (!pool.length) return null;
+    const it = pool[Math.floor(rnd() * pool.length)];
+    const r = E.buy(S, it.id);
+    return r.ok ? it : null;
   };
 
   // 跑完一生
@@ -148,6 +168,7 @@
         E.startWork(S);
       }
       const f = optsFocus(S, rnd);
+      if (opts.shop !== false && rnd() < 0.3) Sim.maybeShop(S, rnd);
       const out = E.stepYear(S, f);
       if (out && out.event) {
         const idx = Math.floor(rnd() * out.event.options.length);

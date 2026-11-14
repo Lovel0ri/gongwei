@@ -22,7 +22,7 @@
   <!-- ============================ 封面 -->
   <section id="s-landing" class="screen active">
     <div class="landing-inner">
-      <div class="kicker">人生模拟器 · 中国 · v0.6.0</div>
+      <div class="kicker">人生模拟器 · 中国 · v0.7.0</div>
       <h1 class="title">工位</h1>
       <div class="subtitle">1 in 740 Million</div>
       <p class="lede">
@@ -108,6 +108,7 @@
             <div class="life-who" id="life-who">—</div>
             <div class="life-nums" id="life-nums">—</div>
           </div>
+          <button id="btn-shop" class="shop-open" type="button">生活账本 · 添置与设定</button>
         </section>
 
         <section class="card finance">
@@ -245,6 +246,31 @@
     </div>
     <div class="sheet-foot">
       <button id="peer-close" class="btn ghost wide">关闭</button>
+    </div>
+  </div>
+</div>
+
+
+<!-- ============================ 生活账本 -->
+<div id="shop" class="modal" hidden>
+  <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="shop-title">
+    <div class="sheet-head">
+      <div class="kicker">生活账本 · <span id="shop-cash">¥0</span></div>
+      <h3 id="shop-title">你怎么花钱</h3>
+    </div>
+    <div class="sheet-body">
+      <p class="scene-text">买回家的东西会一直算账：宠物每年吃钱，骑车的人健康一些，机车快但危险。<br>
+        钱怎么存、红白包怎么包、保险买不买、吃什么——这些定下来就一直生效。选择时时间会暂停。</p>
+      <div id="shop-groups"></div>
+      <h4 class="shop-h"><span>生活设定</span><em>每年自动生效</em></h4>
+      <div id="shop-policy" class="life-rows shop-rows"></div>
+      <div class="tiny shop-sum" id="shop-pol-sum">—</div>
+      <h4 class="shop-h"><span>每年自动</span><em>存款超过费用三倍才执行</em></h4>
+      <div id="shop-auto" class="auto-list"></div>
+      <p class="tiny" style="text-align:left">自动做的事会记在人生纪录里；钱不够就跳过，不会让你负债。</p>
+    </div>
+    <div class="sheet-foot">
+      <button id="shop-close" class="btn ghost wide">关闭</button>
     </div>
   </div>
 </div>

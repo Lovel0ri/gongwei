@@ -105,6 +105,13 @@
 
     // 生活方式：默认是最普通的过法，玩家随时可以改
     S.life = Object.assign({}, (D.lifestyles && D.lifestyles.defaults) || {});
+    // 生活账本：买过的东西、兴趣、账上规矩、每年自动
+    S.owned = {};
+    S.boughtAt = {};
+    S.hobbies = [];
+    S.policy = Object.assign({}, (D.policies && D.policies.defaults) || {});
+    S.auto = {};
+    ((D && D.autoShop) || []).forEach(function (a) { S.auto[a.id] = false; });
     S.flags.lastEventAge = D.meta.startAge - 1;
 
     // ---- 身份：姓名、性别、父母
@@ -197,6 +204,192 @@
     return true;
   };
 
+  // ------------------------------------------------------------------ 生活账本
+  E.shopItem = function (id) {
+    const list = (D && D.spending) || [];
+    for (let i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  };
+  E.hobby = function (id) {
+    const list = (D && D.hobbies) || [];
+    for (let i = 0; i < list.length; i++) if (list[i].id === id) return list[i];
+    return null;
+  };
+  E.policyOption = function (S, dim) {
+    const P = D.policies;
+    if (!P || !P.dims[dim]) return null;
+    const want = (S && S.policy && S.policy[dim]) || P.defaults[dim];
+    const list = P.dims[dim].options;
+    for (let i = 0; i < list.length; i++) if (list[i].id === want) return list[i];
+    return list[0];
+  };
+  E.policyTotals = function (S) {
+    const t = { cash: 0, health: 0, spirit: 0, relation: 0 };
+    const P = D.policies;
+    if (!P) return t;
+    P.order.forEach(function (dim) {
+      const o = E.policyOption(S, dim);
+      if (!o) return;
+      t.cash += o.cash || 0;
+      t.health += o.health || 0;
+      t.spirit += o.spirit || 0;
+      t.relation += o.relation || 0;
+    });
+    return t;
+  };
+  E.setPolicy = function (S, dim, id) {
+    const P = D.policies;
+    if (!P || !P.dims[dim]) return false;
+    if (!P.dims[dim].options.some(function (o) { return o.id === id; })) return false;
+    if (!S.policy) S.policy = Object.assign({}, P.defaults);
+    S.policy[dim] = id;
+    return true;
+  };
+  // 买过的东西带来的每周自由时间
+  E.ownedFreedom = function (S) {
+    let f = 0;
+    ((D && D.spending) || []).forEach(function (it) {
+      if (it.perYear && it.perYear.freedom && S.owned && S.owned[it.id]) f += it.perYear.freedom;
+    });
+    return f;
+  };
+  E.canBuy = function (S, it) {
+    if (!it) return { ok: false, why: '没有这件东西' };
+    const owned = (S.owned && S.owned[it.id]) || 0;
+    if (S.age < 18) return { ok: false, why: '18 岁后' };
+    if (it.once && owned) return { ok: false, why: '已经有' };
+    if (it.cooldown) {
+      const last = (S.boughtAt && S.boughtAt[it.id]) || -999;
+      const left = it.cooldown - (S.age - last);
+      if (left > 0) return { ok: false, why: '还要等 ' + left + ' 年' };
+    }
+    if (it.need && !it.need(S)) return { ok: false, why: it.needWhy || '暂时不行' };
+    if (it.kind === 'hobby' && (S.hobbies || []).length >= 3) return { ok: false, why: '兴趣最多三个' };
+    if (it.kind === 'moveout' && S.flags.livingAlone) return { ok: false, why: '已经自己住' };
+    if (it.kind === 'movecity') {
+      if (S.flags.house) return { ok: false, why: '有房搬不动' };
+      if (['t1', 't2'].indexOf(S.draw.tier.id) >= 0) return { ok: false, why: '已经在大城市' };
+    }
+    if (S.stats.cash < it.price) return { ok: false, why: '钱不够' };
+    return { ok: true };
+  };
+  E.buy = function (S, id) {
+    const it = E.shopItem(id);
+    const chk = E.canBuy(S, it);
+    if (!chk.ok) return { ok: false, why: chk.why, lines: [] };
+    const st = S.stats;
+    const lines = [];
+    st.cash -= it.price;
+    S.owned = S.owned || {};
+    S.boughtAt = S.boughtAt || {};
+    S.boughtAt[id] = S.age;
+    if (it.once) S.owned[id] = (S.owned[id] || 0) + 1;
+    applyPlain(S, it.eff || {});
+
+    if (it.kind === 'hobby') {
+      S.hobbies = S.hobbies || [];
+      const pool = (D.hobbies || []).filter(function (h) { return S.hobbies.indexOf(h.id) < 0; });
+      if (!pool.length) return { ok: false, why: '能试的都试过了', lines: [] };
+      const h = pool[Math.floor(S.rnd() * pool.length)];
+      S.hobbies.push(h.id);
+      lines.push({ age: S.age, kind: 'life', text: '你开始' + h.name + '。' + h.note + '。' });
+      return { ok: true, lines: lines, item: it };
+    }
+    if (it.kind === 'partner') {
+      S.flags.seekingUntil = (S.year || 0) + 3;
+      lines.push({ age: S.age, kind: 'life', text: '你开始认真找人介绍、参加聚会。相亲这件事，先把话说在前头会好一点。' });
+      return { ok: true, lines: lines, item: it };
+    }
+    if (it.kind === 'moveout') {
+      S.flags.livingAlone = true;
+      lines.push({ age: S.age, kind: 'life', text: '你搬了出去。第一晚，房间很空，但门是你自己锁的。' });
+      return { ok: true, lines: lines, item: it };
+    }
+    if (it.kind === 'abroad') {
+      S.flags.abroadDoor = true;
+      lines.push({ age: S.age, kind: 'life', text: '你托人打听到了几条出去的路。都很难，但都是路。' });
+      return { ok: true, lines: lines, item: it };
+    }
+    if (it.kind === 'movecity') {
+      const tiers = D.cityTiers[S.region] || D.cityTiers.CN;
+      const order = ['t6', 't5', 't4', 't3', 't2', 't1'];
+      const idx = order.indexOf(S.draw.tier.id);
+      const nt = tiers.filter(function (t) { return t.id === order[Math.min(order.length - 1, idx + 1)]; })[0];
+      if (!nt) return { ok: true, lines: lines, item: it };
+      const oldMul = S.draw.tier.salaryMul || 1;
+      S.draw.tier = Object.assign({}, nt);
+      S.draw.tier.salaryMul = 0.45 + 0.55 * nt.cost;
+      S.draw.cityTier = nt.id;
+      S.draw.cityName = nt.samples[Math.floor(S.rnd() * nt.samples.length)];
+      st.salary = Math.round(st.salary * (S.draw.tier.salaryMul / oldMul));
+      lines.push({ age: S.age, kind: 'life', text: '你搬到了' + S.draw.cityName + '。房租涨了，工资也涨了，人还是那个人。' });
+      return { ok: true, lines: lines, item: it };
+    }
+    lines.push({ age: S.age, kind: 'life', text: '你把「' + it.name + '」买回了家。' + (it.desc ? '' : '') });
+    return { ok: true, lines: lines, item: it };
+  };
+  // 一年里账本上的进出：设定、利息、已买的东西、兴趣、自动消费
+  E.applyLedger = function (S, out, age) {
+    const st = S.stats;
+    const r = { cash: 0, health: 0, spirit: 0, relation: 0, skill: 0 };
+    const lines = (out && out.lines) || [];
+    const pol = E.policyTotals(S);
+    r.cash += pol.cash; r.health += pol.health; r.spirit += pol.spirit; r.relation += pol.relation;
+
+    // 钱放在哪
+    if (st.cash > 0) {
+      const way = (E.policyOption(S, 'save') || {}).id;
+      let interest = 0;
+      if (way === 'bank') interest = st.cash * 0.015;
+      else if (way === 'fund') {
+        const rate = clamp(0.04 + (S.rnd() - 0.5) * 0.26, -0.18, 0.22);
+        interest = st.cash * rate;
+        if (interest < -2000) lines.push({ age: age, kind: 'bad', text: '基金今年亏了 ' + (Math.abs(interest) / 10000).toFixed(1) + ' 万。你决定"再放放"。' });
+        else if (interest > 2000) lines.push({ age: age, kind: 'good', text: '基金今年赚了 ' + (interest / 10000).toFixed(1) + ' 万。你觉得自己还行。' });
+      } else if ((age % 9) === 0) {
+        lines.push({ age: age, kind: 'money', text: '现金放在家里，一分利息也没有。你也懒得去开户。' });
+      }
+      r.cash += interest;
+    }
+
+    // 已经买回家的东西
+    ((D && D.spending) || []).forEach(function (it) {
+      if (!it.perYear || !S.owned || !S.owned[it.id]) return;
+      const p = it.perYear;
+      r.cash += p.cash || 0; r.health += p.health || 0; r.spirit += p.spirit || 0;
+      r.relation += p.relation || 0; r.skill += p.skill || 0;
+      if (it.risk && S.rnd() < it.risk) {
+        r.health -= 6; r.cash -= 8000;
+        lines.push({ age: age, kind: 'bad', text: '你骑着' + it.name + '在路口被一辆右转的车带倒了。人没事，车要修。' });
+      }
+    });
+
+    // 兴趣：每年给一点心气和能力
+    (S.hobbies || []).forEach(function (id) {
+      const h = E.hobby(id);
+      if (!h) return;
+      r.spirit += h.spirit || 0; r.skill += h.skill || 0;
+      r.health += h.health || 0; r.relation += h.relation || 0;
+    });
+
+    // 每年自动：存款超过费用三倍才执行
+    ((D && D.autoShop) || []).forEach(function (a) {
+      if (!S.auto || !S.auto[a.id]) return;
+      const it = E.shopItem(a.id);
+      if (!it) return;
+      if ((age - D.meta.startAge) % (a.every || 1) !== 0) return;
+      if (it.once && S.owned && S.owned[it.id]) return;
+      if (st.cash + r.cash < it.price * 3) return;
+      r.cash -= it.price;
+      const e = it.eff || {};
+      r.cash += e.cash || 0; r.health += e.health || 0; r.spirit += e.spirit || 0;
+      r.relation += e.relation || 0; r.skill += e.skill || 0;
+      if (it.once) { S.owned = S.owned || {}; S.owned[it.id] = 1; }
+      lines.push({ age: age, kind: 'life', text: '（自动）' + it.name + '，' + it.price.toLocaleString('zh-CN') + ' 元。' + (it.desc || '') });
+    });
+    return r;
+  };
+
   // ------------------------------------------------------------------ 推进一年
   E.stepYear = function (S, focusId) {
     if (S.over) return { lines: [], event: null };
@@ -211,7 +404,7 @@
 
     // ---- 工时
     st.hours = clamp(ind.hours + f.hours + (age >= 45 ? -1 : 0), 28, 82);
-    st.freedom = round(168 - 56 - st.hours - (S.draw.tier.id === 't1' ? 8 : S.draw.tier.id === 't2' ? 6 : 5) - 4 + lt.freedom, 0);
+    st.freedom = round(168 - 56 - st.hours - (S.draw.tier.id === 't1' ? 8 : S.draw.tier.id === 't2' ? 6 : 5) - 4 + lt.freedom + E.ownedFreedom(S), 0);
     st.freedom = clamp(st.freedom, 0, 120);
 
     // ---- 薪资成长
@@ -349,6 +542,22 @@
     dK *= clamp(1 - st.skill / (ceil + 8), 0, 1.15);
     st.skill = clamp(st.skill + dK, 0, 100);
     st.relation = clamp(st.relation - 0.55 + f.relation * (1 - st.relation / 130) + lt.relation + (st.skill > 70 ? 0.2 : 0), 0, 100);
+
+    // ---- 生活账本：账上规矩、利息、买过的东西、兴趣、每年自动
+    const led = E.applyLedger(S, out, age);
+    st.cash += led.cash;
+    st.health = clamp(st.health + led.health, 0, 100);
+    st.spirit = clamp(st.spirit + led.spirit, 0, 100);
+    st.relation = clamp(st.relation + led.relation, 0, 100);
+    st.skill = clamp(st.skill + led.skill, 0, 100);
+
+    // ---- 主动找对象：找过之后的三年里，遇到人的概率明显变高
+    if (!S.flags.partner && S.flags.seekingUntil && S.year < S.flags.seekingUntil && age >= 22 && S.rnd() < 0.3) {
+      S.flags.partner = true;
+      st.spirit = clamp(st.spirit + 6, 0, 100);
+      st.relation = clamp(st.relation + 4, 0, 100);
+      out.lines.push({ age, kind: 'life', text: '你遇到了一个人。没有什么戏剧性，就是某天开始，你们每天都会说几句话。' });
+    }
 
     // ---- 状态快照（给同秒出生的人用）
     S.statusLog = S.statusLog || {};
@@ -566,7 +775,15 @@
     const eff = o.eff || {};
     const lines = [];
 
-    if (eff.cash) { st.cash += eff.cash; lines.push({ age: S.age, kind: eff.cash < 0 ? 'money' : 'good', text: (eff.cash < 0 ? '支出 ¥' : '进账 ¥') + Math.abs(eff.cash).toLocaleString('zh-CN') }); }
+    if (eff.cash) {
+      const medMul = (ev.medical && S.policy && S.policy.insure === 'full' && eff.cash < 0) ? 0.5 : 1;
+      const c = Math.round(eff.cash * (eff.cash < 0 ? medMul : 1));
+      st.cash += c;
+      lines.push({
+        age: S.age, kind: c < 0 ? 'money' : 'good',
+        text: (c < 0 ? '支出 ¥' : '进账 ¥') + Math.abs(c).toLocaleString('zh-CN') + (medMul < 1 ? '（保险报了一半）' : ''),
+      });
+    }
     if (eff.salaryMul) { st.salary *= eff.salaryMul; }
     if (eff.health) st.health = clamp(st.health + eff.health, 0, 100);
     if (eff.spirit) st.spirit = clamp(st.spirit + eff.spirit, 0, 100);

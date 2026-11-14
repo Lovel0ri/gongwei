@@ -334,6 +334,7 @@
     renderScene();
     renderFocus();
     renderLife();
+    renderShopBtn();
     renderLog();
     renderFamily();
     renderPeers();
@@ -527,6 +528,159 @@
     const who = $('#life-who'), nums = $('#life-nums');
     if (who) who.textContent = L.order.map(function (dim) { return E.lifeOption(S, dim).name; }).join(' · ');
     if (nums) nums.textContent = parts.length ? '每年：' + parts.join(' · ') : '每年：不增不减，随波逐流';
+  }
+
+
+  // ------------------------------------------------------------------ 生活账本
+  const SHOP_LABEL = { spirit: '心气', relation: '关系', health: '健康', skill: '能力', acad: '成绩' };
+  function shopDelta(n) {
+    const v = Math.abs(n);
+    return (n > 0 ? '+' : '−') + (Math.abs(v % 1) > 0.001 ? v.toFixed(1) : v);
+  }
+  function shopEffectText(it) {
+    const out = [];
+    const e = it.eff || {};
+    Object.keys(SHOP_LABEL).forEach(function (k) {
+      if (e[k]) out.push(SHOP_LABEL[k] + ' ' + shopDelta(e[k]));
+    });
+    const p = it.perYear || {};
+    const py = [];
+    Object.keys(SHOP_LABEL).forEach(function (k) {
+      if (p[k]) py.push(SHOP_LABEL[k] + ' ' + shopDelta(p[k]));
+    });
+    if (p.freedom) py.push('自由 ' + shopDelta(p.freedom) + 'h');
+    if (it.risk) py.push(Math.round(it.risk * 100) + '% 事故');
+    if (py.length) out.push('之后每年 ' + py.join(' · '));
+    return out.join(' · ');
+  }
+
+  function renderShopBtn() {
+    const b = $('#btn-shop');
+    if (!b || !S) return;
+    const locked = S.age < 18;
+    b.disabled = locked;
+    b.textContent = locked ? '18 岁以后才能自己决定怎么花钱' : '生活账本 · 添置与设定';
+  }
+
+  function renderShop() {
+    if (!S) return;
+    const cashEl = $('#shop-cash');
+    if (cashEl) cashEl.textContent = (isStudent() ? '家里的钱 ' : '现金 ') + fmtMoney(S.stats.cash);
+    const box = $('#shop-groups');
+    if (!box) return;
+    box.innerHTML = '';
+    (D.spendingGroups || []).forEach(function (g) {
+      const items = (D.spending || []).filter(function (it) { return it.group === g.id; });
+      if (!items.length) return;
+      const head = document.createElement('div');
+      head.className = 'shop-g';
+      head.innerHTML = '<span>' + g.name + '</span><em>' + items.length + '</em>';
+      box.appendChild(head);
+      items.forEach(function (it) {
+        const chk = E.canBuy(S, it);
+        const has = !!(S.owned && S.owned[it.id]);
+        const row = document.createElement('div');
+        row.className = 'shop-item' + (has && it.once ? ' owned' : '');
+        const eff = shopEffectText(it);
+        const priceTxt = (has && it.once) ? '已买' : fmtMoney(it.price);
+        row.innerHTML = '<div class="si-main"><div class="si-t"><span>' + it.name +
+          '</span><span class="si-price">' + priceTxt + '</span></div>' +
+          '<div class="si-n">' + (it.desc || '') + (eff ? (it.desc ? ' · ' : '') + eff : '') + '</div></div>';
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'si-buy';
+        b.textContent = chk.ok ? '买' : (chk.why || '不行');
+        b.disabled = !chk.ok;
+        b.onclick = function () { doBuy(it.id); };
+        row.appendChild(b);
+        box.appendChild(row);
+      });
+    });
+    renderShopPolicy();
+    renderShopAuto();
+  }
+
+  function renderShopPolicy() {
+    const box = $('#shop-policy');
+    if (!box) return;
+    box.innerHTML = '';
+    D.policies.order.forEach(function (dim) {
+      const d = D.policies.dims[dim];
+      const row = document.createElement('div');
+      row.className = 'life-row';
+      const k = document.createElement('span');
+      k.className = 'life-k';
+      k.textContent = d.name;
+      const wrap = document.createElement('span');
+      wrap.className = 'life-chips';
+      d.options.forEach(function (o) {
+        const sel = (S.policy && S.policy[dim]) === o.id;
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'lchip' + (sel ? ' on' : '');
+        b.textContent = o.name;
+        b.title = o.note;
+        b.setAttribute('aria-pressed', sel ? 'true' : 'false');
+        b.onclick = function () {
+          if (!E.setPolicy(S, dim, o.id)) return;
+          renderShop(); renderAll(); save();
+        };
+        wrap.appendChild(b);
+      });
+      row.appendChild(k); row.appendChild(wrap);
+      box.appendChild(row);
+    });
+    const t = E.policyTotals(S);
+    const sum = $('#shop-pol-sum');
+    if (sum) {
+      const parts = [];
+      if (t.cash) parts.push(fmtMoney(-t.cash));
+      if (t.health) parts.push('健康 ' + shopDelta(t.health));
+      if (t.spirit) parts.push('心气 ' + shopDelta(t.spirit));
+      if (t.relation) parts.push('关系 ' + shopDelta(t.relation));
+      sum.textContent = '这套规矩每年：' + (parts.length ? parts.join(' · ') : '不增不减');
+    }
+  }
+
+  function renderShopAuto() {
+    const box = $('#shop-auto');
+    if (!box) return;
+    box.innerHTML = '';
+    (D.autoShop || []).forEach(function (a) {
+      const it = E.shopItem(a.id);
+      if (!it) return;
+      const on = !!(S.auto && S.auto[a.id]);
+      const row = document.createElement('div');
+      row.className = 'auto-row';
+      row.innerHTML = '<div class="ar-main"><div class="ar-t">' + a.name +
+        ' · 每' + (a.every === 1 ? '年' : a.every + '年') + '</div>' +
+        '<div class="ar-n">每次 ' + fmtMoney(it.price) + '</div></div>';
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'tbtn' + (on ? ' on' : '');
+      b.textContent = on ? '自动中' : '手动';
+      b.onclick = function () {
+        if (!S.auto) S.auto = {};
+        S.auto[a.id] = !S.auto[a.id];
+        renderShop(); save();
+      };
+      row.appendChild(b);
+      box.appendChild(row);
+    });
+  }
+
+  function doBuy(id) {
+    if (!S) return;
+    const r = E.buy(S, id);
+    if (!r.ok) { renderShop(); return; }
+    (r.lines || []).forEach(function (l) { S.log.push(l); });
+    renderShop(); renderAll(); save();
+  }
+
+  function openShop() {
+    if (!S || S.age < 18) return;
+    renderShop();
+    openOverlay('#shop');
   }
 
   function renderLog() {
@@ -1250,6 +1404,12 @@
       o.rnd = rnd;
       S = o;
       if (!S.life && D.lifestyles) S.life = Object.assign({}, D.lifestyles.defaults);
+      if (!S.owned) S.owned = {};
+      if (!S.boughtAt) S.boughtAt = {};
+      if (!S.hobbies) S.hobbies = [];
+      if (!S.policy && D.policies) S.policy = Object.assign({}, D.policies.defaults);
+      if (!S.auto) S.auto = {};
+      ((D && D.autoShop) || []).forEach(function (a) { if (S.auto[a.id] === undefined) S.auto[a.id] = false; });
       if (!S.peers) S.peers = Sim.buildPeers(S.seed, 5);
       wantRun = false; running = false; stopTimer(); busy = false; autoStarted = true;
       show('s-play');
@@ -1366,13 +1526,17 @@
     if (galClose) galClose.onclick = function () { closeOverlay('#gallery'); };
     const peerClose = $('#peer-close');
     if (peerClose) peerClose.onclick = function () { closeOverlay('#peer'); };
+    const shopBtn = $('#btn-shop');
+    if (shopBtn) shopBtn.onclick = openShop;
+    const shopClose = $('#shop-close');
+    if (shopClose) shopClose.onclick = function () { closeOverlay('#shop'); };
     try { renderGallery(); } catch (e) {}
 
     document.querySelector('.stat-note').onclick = function () { this.classList.toggle('open'); };
 
     document.addEventListener('keydown', function (e) {
       // 覆盖层：Esc 关闭，Tab 圈在层里
-      const overlay = ['#about', '#gallery', '#peer'].find(function (id) { return !$(id).hidden; });
+      const overlay = ['#about', '#gallery', '#peer', '#shop'].find(function (id) { return !$(id).hidden; });
       if (overlay) {
         if (e.key === 'Escape') { e.preventDefault(); closeOverlay(overlay); return; }
         if (e.key === 'Tab') { trapTab(e, $(overlay + ' .sheet')); return; }

@@ -305,7 +305,7 @@
       ],
     },
     {
-      id: 'ev_checkup', tag: '生活', weight: 7, ageMin: 28, ageMax: 58,
+      id: 'ev_checkup', tag: '生活', weight: 7, ageMin: 28, ageMax: 58, medical: true,
       title: '体检异常',
       text: '体检报告出来，第一页有两项标红。医生的建议是"注意休息，定期复查"。',
       options: [
@@ -363,7 +363,7 @@
       ],
     },
     {
-      id: 'ev_injury', tag: '黑天鹅', weight: 3, ageMin: 24, ageMax: 55,
+      id: 'ev_injury', tag: '黑天鹅', weight: 3, ageMin: 24, ageMax: 55, medical: true,
       title: '通勤路上',
       text: '早高峰，电动车在路口被一辆右转的车带倒。你躺在地上，第一个念头是"今天有个会"。',
       options: [
