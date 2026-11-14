@@ -169,6 +169,7 @@ body {
 .col { min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow: hidden; padding-right: 2px; }
 .col-left, .col-right { overflow-y: auto; }
 .col-center > .card { flex: 0 0 auto; }
+.col-left > .card, .col-right > .card { flex: 0 0 auto; }
 .col::-webkit-scrollbar { width: 6px; }
 .col::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
 .col::-webkit-scrollbar-track { background: transparent; }
@@ -237,20 +238,19 @@ body {
 }
 .lchip:hover { border-color: var(--accent); color: var(--text); }
 .lchip.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
-.life-sum { margin: 9px 13px 0; padding: 8px 0 11px; border-top: 1px dashed var(--line); }
+.life-sum { margin: 8px 13px 0; padding: 7px 0 8px; border-top: 1px dashed var(--line); }
 .life-who { font-size: 11.5px; color: var(--text-2); line-height: 1.5; }
 .life-nums { font-size: 10px; color: var(--text-3); font-family: var(--mono); margin-top: 3px; line-height: 1.65; }
 
 
 /* ---------------- 生活账本（弹层） */
-.shop-open {
-  display: block; width: calc(100% - 26px); margin: 0 13px 12px;
-  appearance: none; cursor: pointer; border: 1px solid var(--line); background: var(--surface-2);
-  color: var(--text-2); border-radius: 3px; padding: 8px 10px; font-family: var(--sans);
-  font-size: 11.5px; letter-spacing: .02em; transition: .15s; text-align: center;
+.card-head .mini {
+  appearance: none; cursor: pointer; border: 1px solid var(--line); background: transparent;
+  color: var(--text-2); border-radius: 2px; padding: 1px 6px; font-family: var(--mono);
+  font-size: 10px; letter-spacing: .02em; transition: .14s; vertical-align: 1px;
 }
-.shop-open:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
-.shop-open:disabled { opacity: .5; cursor: not-allowed; }
+.card-head .mini:hover:not(:disabled) { border-color: var(--accent); color: var(--accent); }
+.card-head .mini:disabled { opacity: .45; cursor: not-allowed; }
 .shop-g {
   display: flex; justify-content: space-between; align-items: baseline;
   margin: 18px 0 2px; padding-bottom: 5px; border-bottom: 1px solid var(--line);

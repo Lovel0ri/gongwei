@@ -525,8 +525,7 @@
     if (t.freedom) parts.push('自由 ' + lifeSign(t.freedom) + 'h/周');
     if (t.misc) parts.push('杂项花销 ' + lifeSign(t.misc * 100, '%'));
     if (t.cash) parts.push('固定花销 ' + fmtMoney(-t.cash) + '/年');
-    const who = $('#life-who'), nums = $('#life-nums');
-    if (who) who.textContent = L.order.map(function (dim) { return E.lifeOption(S, dim).name; }).join(' · ');
+    const nums = $('#life-nums');
     if (nums) nums.textContent = parts.length ? '每年：' + parts.join(' · ') : '每年：不增不减，随波逐流';
   }
 
@@ -559,7 +558,8 @@
     if (!b || !S) return;
     const locked = S.age < 18;
     b.disabled = locked;
-    b.textContent = locked ? '18 岁以后才能自己决定怎么花钱' : '生活账本 · 添置与设定';
+    b.textContent = locked ? '账本（18 岁）' : '账本 ›';
+    b.title = locked ? '18 岁以后才能自己决定怎么花钱' : '生活账本 · 添置与设定';
   }
 
   function renderShop() {
