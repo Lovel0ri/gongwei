@@ -11,7 +11,7 @@
   D.meta = {
     title: '工位',
     subtitle: '1 in 740 Million',
-    version: '0.7.0',
+    version: '0.7.1',
     region: 'CN',
     currency: 'CNY',
     symbol: '¥',
